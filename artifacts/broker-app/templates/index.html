@@ -21,112 +21,192 @@
 
 <main>
 
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-icon blue">🏘️</div>
-      <div>
-        <div class="stat-label">Total</div>
-        <div class="stat-value" id="statTotal">—</div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon green">✅</div>
-      <div>
-        <div class="stat-label">Available</div>
-        <div class="stat-value" id="statAvailable">—</div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon red">🔑</div>
-      <div>
-        <div class="stat-label">Sold</div>
-        <div class="stat-value" id="statSold">—</div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-icon purple">💰</div>
-      <div>
-        <div class="stat-label">Avg Price</div>
-        <div class="stat-value" id="statAvgPrice">—</div>
-      </div>
-    </div>
+  <div class="tabs-bar">
+    <button class="tab-btn active" id="tab-inventory" onclick="showTab('inventory')">📋 Inventory</button>
+    <button class="tab-btn" id="tab-matcher" onclick="showTab('matcher')">💬 AI Matcher</button>
+    <button class="tab-btn" id="tab-inquiries" onclick="showTab('inquiries')">📁 Inquiries</button>
   </div>
 
-  <div class="section">
-    <div class="section-header">
-      <div class="section-title">📋 Property Inventory</div>
-      <div class="filters-row">
-        <input
-          type="text"
-          id="searchInput"
-          class="search-input"
-          placeholder="Search by location or type..."
-        />
-        <select id="typeFilter" class="filter-select">
-          <option value="">All Types</option>
-          <option>Apartment</option>
-          <option>House</option>
-          <option>Villa</option>
-          <option>Office</option>
-          <option>Shop</option>
-          <option>Land</option>
-          <option>Warehouse</option>
-        </select>
-        <select id="statusFilter" class="filter-select">
-          <option value="">All Status</option>
-          <option>Available</option>
-          <option>Reserved</option>
-          <option>Sold</option>
-          <option>Rented</option>
-        </select>
-      </div>
-    </div>
-
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>Location</th>
-            <th>Size</th>
-            <th>Price</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="propertiesBody">
-          <tr><td colspan="6" class="empty-row">Loading...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="whatsapp-section">
-      <div class="whatsapp-header">
-        <div class="whatsapp-icon">💬</div>
+  <!-- INVENTORY TAB -->
+  <div class="tab-panel active" id="panel-inventory">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">🏘️</div>
         <div>
-          <h2>AI Property Matcher</h2>
-          <p>Paste a WhatsApp message and AI will find matching properties</p>
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="statTotal">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">✅</div>
+        <div>
+          <div class="stat-label">Available</div>
+          <div class="stat-value" id="statAvailable">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">🔑</div>
+        <div>
+          <div class="stat-label">Sold</div>
+          <div class="stat-value" id="statSold">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">💰</div>
+        <div>
+          <div class="stat-label">Avg Price</div>
+          <div class="stat-value" id="statAvgPrice">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">📋 Property Inventory</div>
+        <div class="filters-row">
+          <input
+            type="text"
+            id="searchInput"
+            class="search-input"
+            placeholder="Search by location or type..."
+          />
+          <select id="typeFilter" class="filter-select">
+            <option value="">All Types</option>
+            <option>Apartment</option>
+            <option>House</option>
+            <option>Villa</option>
+            <option>Office</option>
+            <option>Shop</option>
+            <option>Land</option>
+            <option>Warehouse</option>
+          </select>
+          <select id="statusFilter" class="filter-select">
+            <option value="">All Status</option>
+            <option>Available</option>
+            <option>Reserved</option>
+            <option>Sold</option>
+            <option>Rented</option>
+          </select>
         </div>
       </div>
 
-      <textarea
-        id="whatsappMsg"
-        placeholder="Paste a client's WhatsApp message here...
-Example: 'Hi, I'm looking for a 3-bedroom apartment in downtown, budget around $200,000, preferably available immediately'"
-      ></textarea>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Location</th>
+              <th>Size</th>
+              <th>Price</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="propertiesBody">
+            <tr><td colspan="6" class="empty-row">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-      <button class="match-btn" id="matchBtn" onclick="matchProperties()">
-        🔍 Find Matches
-      </button>
+  <!-- AI MATCHER TAB -->
+  <div class="tab-panel" id="panel-matcher">
+    <div class="section">
+      <div class="whatsapp-section">
+        <div class="whatsapp-header">
+          <div class="whatsapp-icon">💬</div>
+          <div>
+            <h2>AI Property Matcher</h2>
+            <p>Paste a client's WhatsApp message and AI will find matching properties</p>
+          </div>
+        </div>
 
-      <div id="matchResult"></div>
+        <textarea
+          id="whatsappMsg"
+          placeholder="Paste a client's WhatsApp message here...
+Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available ho'"
+        ></textarea>
+
+        <button class="match-btn" id="matchBtn" onclick="matchProperties()">
+          🔍 Find Matches
+        </button>
+
+        <div id="matchResult"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- INQUIRIES TAB -->
+  <div class="tab-panel" id="panel-inquiries">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon blue">📁</div>
+        <div>
+          <div class="stat-label">Total</div>
+          <div class="stat-value" id="inqStatTotal">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">🆕</div>
+        <div>
+          <div class="stat-label">New</div>
+          <div class="stat-value" id="inqStatNew">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon red">🔄</div>
+        <div>
+          <div class="stat-label">In Progress</div>
+          <div class="stat-value" id="inqStatProgress">—</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">✔️</div>
+        <div>
+          <div class="stat-label">Closed</div>
+          <div class="stat-value" id="inqStatClosed">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <div class="section-title">📁 Client Inquiries</div>
+        <div class="filters-row">
+          <select id="inqStatusFilter" class="filter-select">
+            <option value="">All Status</option>
+            <option>New</option>
+            <option>In Progress</option>
+            <option>Closed</option>
+            <option>Lost</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Message</th>
+              <th>Matched</th>
+              <th>Status</th>
+              <th>Date / Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inquiriesBody">
+            <tr><td colspan="6" class="empty-row">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
 </main>
 
+<!-- ADD/EDIT PROPERTY MODAL -->
 <div class="modal-overlay" id="propModal">
   <div class="modal">
     <div class="modal-header">
@@ -150,16 +230,16 @@ Example: 'Hi, I'm looking for a 3-bedroom apartment in downtown, budget around $
         </div>
         <div class="form-group">
           <label>Location</label>
-          <input type="text" id="propLocation" placeholder="e.g. Downtown, City Center..." required />
+          <input type="text" id="propLocation" placeholder="e.g. Sector 17, Chandigarh..." required />
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label>Size (sqm)</label>
-            <input type="number" id="propSize" placeholder="e.g. 120" min="1" required />
+            <label>Size (sq ft)</label>
+            <input type="number" id="propSize" placeholder="e.g. 1200" min="1" required />
           </div>
           <div class="form-group">
-            <label>Price ($)</label>
-            <input type="number" id="propPrice" placeholder="e.g. 250000" min="0" required />
+            <label>Price (Rs)</label>
+            <input type="number" id="propPrice" placeholder="e.g. 5000000" min="0" required />
           </div>
         </div>
         <div class="form-group">
@@ -175,6 +255,76 @@ Example: 'Hi, I'm looking for a 3-bedroom apartment in downtown, budget around $
       <div class="modal-footer">
         <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn-primary" id="saveBtn">Save Property</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- SAVE INQUIRY MODAL -->
+<div class="modal-overlay" id="saveInquiryModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Save as Inquiry</h3>
+      <button class="modal-close" onclick="closeSaveInquiryModal()">✕</button>
+    </div>
+    <form id="saveInquiryForm">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Client Name</label>
+          <input type="text" id="inqClientName" placeholder="e.g. Rajesh Kumar" required />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="inqStatus">
+            <option value="New">New</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+            <option value="Lost">Lost</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" id="inqNotes" placeholder="Any follow-up notes..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeSaveInquiryModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="saveInquiryBtn">Save Inquiry</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT INQUIRY MODAL -->
+<div class="modal-overlay" id="editInquiryModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Edit Inquiry</h3>
+      <button class="modal-close" onclick="closeEditInquiryModal()">✕</button>
+    </div>
+    <form id="editInquiryForm">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Client Name</label>
+          <input type="text" id="editInqClientName" required />
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="editInqStatus">
+            <option value="New">New</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+            <option value="Lost">Lost</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <input type="text" id="editInqNotes" placeholder="Follow-up notes..." />
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" onclick="closeEditInquiryModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="updateInquiryBtn">Save Changes</button>
       </div>
     </form>
   </div>

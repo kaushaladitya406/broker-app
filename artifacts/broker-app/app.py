@@ -34,6 +34,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS inquiries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_name TEXT NOT NULL,
+            whatsapp_message TEXT NOT NULL,
+            matched_property_ids TEXT NOT NULL DEFAULT '[]',
+            notes TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'New',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     db.commit()
     db.close()
 
@@ -106,6 +117,74 @@ def update_property(prop_id):
     return jsonify(dict(row))
 
 
+@app.route("/api/inquiries", methods=["GET"])
+def get_inquiries():
+    db = get_db()
+    status_filter = request.args.get("status", "").strip()
+    sql = "SELECT * FROM inquiries WHERE 1=1"
+    params = []
+    if status_filter:
+        sql += " AND status = ?"
+        params.append(status_filter)
+    sql += " ORDER BY created_at DESC"
+    rows = db.execute(sql, params).fetchall()
+    result = []
+    for r in rows:
+        row = dict(r)
+        row["matched_property_ids"] = json.loads(row["matched_property_ids"])
+        result.append(row)
+    return jsonify(result)
+
+
+@app.route("/api/inquiries", methods=["POST"])
+def add_inquiry():
+    data = request.get_json()
+    required = ["client_name", "whatsapp_message"]
+    if not all(k in data for k in required):
+        return jsonify({"error": "Missing required fields"}), 400
+
+    matched_ids = json.dumps(data.get("matched_property_ids", []))
+    db = get_db()
+    cursor = db.execute(
+        "INSERT INTO inquiries (client_name, whatsapp_message, matched_property_ids, notes, status) VALUES (?, ?, ?, ?, ?)",
+        (
+            data["client_name"],
+            data["whatsapp_message"],
+            matched_ids,
+            data.get("notes", ""),
+            data.get("status", "New"),
+        )
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM inquiries WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    result = dict(row)
+    result["matched_property_ids"] = json.loads(result["matched_property_ids"])
+    return jsonify(result), 201
+
+
+@app.route("/api/inquiries/<int:inq_id>", methods=["DELETE"])
+def delete_inquiry(inq_id):
+    db = get_db()
+    db.execute("DELETE FROM inquiries WHERE id = ?", (inq_id,))
+    db.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/inquiries/<int:inq_id>", methods=["PUT"])
+def update_inquiry(inq_id):
+    data = request.get_json()
+    db = get_db()
+    db.execute(
+        "UPDATE inquiries SET client_name=?, notes=?, status=? WHERE id=?",
+        (data["client_name"], data.get("notes", ""), data["status"], inq_id)
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM inquiries WHERE id = ?", (inq_id,)).fetchone()
+    result = dict(row)
+    result["matched_property_ids"] = json.loads(result["matched_property_ids"])
+    return jsonify(result)
+
+
 @app.route("/api/match", methods=["POST"])
 def match_properties():
     data = request.get_json()
@@ -121,8 +200,8 @@ def match_properties():
         return jsonify({"matches": [], "summary": "No properties in inventory to match against."})
 
     inventory_text = "\n".join([
-        f"ID {p['id']}: {p['property_type']} in {p['location']}, {p['size']} sqm, "
-        f"${p['price']:,.0f}, Status: {p['status']}"
+        f"ID {p['id']}: {p['property_type']} in {p['location']}, {p['size']} sq ft, "
+        f"Rs {p['price']:,.0f}, Status: {p['status']}"
         for p in inventory
     ])
 
@@ -132,7 +211,7 @@ def match_properties():
         api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
     )
 
-    prompt = f"""You are a real estate broker assistant. A client sent this WhatsApp message:
+    prompt = f"""You are a real estate broker assistant in India. A client sent this WhatsApp message:
 
 "{message}"
 
@@ -168,6 +247,7 @@ Return ONLY valid JSON, no markdown, no extra text."""
 
     return jsonify({
         "matches": matched_props,
+        "matched_ids": matched_ids,
         "summary": result.get("summary", ""),
     })
 
