@@ -482,6 +482,59 @@ textarea#whatsappMsg::placeholder { color: #9ca3af; }
 }
 .btn-cancel:hover { background: var(--border); color: var(--text); }
 
+/* ─── Config tag & Area cell ─────────────────────────────────────────────── */
+.config-tag {
+  display: inline-block;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+.area-cell { font-size: 13px; }
+.sqft-sub { font-size: 11px; color: var(--text-muted); }
+
+/* ─── Area input row ─────────────────────────────────────────────────────── */
+.area-input-row {
+  display: flex;
+  gap: 8px;
+}
+.area-input-row input {
+  flex: 1;
+  min-width: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 15px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.area-input-row input:focus { border-color: var(--primary); }
+.area-input-row select {
+  width: 120px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 8px;
+  font-size: 14px;
+  outline: none;
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.area-input-row select:focus { border-color: var(--primary); }
+.area-conversion {
+  font-size: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  margin-top: 5px;
+  min-height: 16px;
+}
+
 /* ─── Quick Add via AI ───────────────────────────────────────────────────── */
 .quick-add-section {
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);

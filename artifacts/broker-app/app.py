@@ -11,6 +11,20 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "broker.db")
 BROKER_USERNAME = os.environ.get("BROKER_USERNAME", "admin")
 BROKER_PASSWORD = os.environ.get("BROKER_PASSWORD", "broker123")
 
+UNIT_TO_SQFT = {
+    "Sq Ft": 1,
+    "Sq Yards": 9,
+    "Gaj": 9,
+    "Marla": 272.25,
+    "Kanal": 5445,
+    "Bigha": 9070,
+}
+VALID_UNITS = list(UNIT_TO_SQFT.keys())
+VALID_CONFIGS = ["1BHK", "2BHK", "3BHK", "4BHK+", "Shop/Office", "Plot", "Other"]
+
+def to_sqft(value, unit):
+    return round(float(value) * UNIT_TO_SQFT.get(unit, 1), 2)
+
 
 # ─── DB helpers ────────────────────────────────────────────────────────────────
 
@@ -28,19 +42,73 @@ def close_db(exc):
         db.close()
 
 
+SEED_PROPERTIES = [
+    ("Apartment", "Sector 17, Chandigarh",   "3BHK",       3,   "Marla",  6500000,  "Available"),
+    ("Apartment", "Phase 7, Mohali",          "2BHK",       2,   "Marla",  4200000,  "Available"),
+    ("House",     "Sector 8, Patiala",        "4BHK+",      4,   "Marla",  15000000, "Available"),
+    ("Apartment", "Urban Estate, Patiala",    "1BHK",       1,   "Marla",  1800000,  "Rented"),
+    ("Land",      "Sector 20, Panchkula",     "Plot",       10,  "Marla",  9500000,  "Available"),
+    ("Apartment", "Zirakpur",                 "2BHK",       2,   "Marla",  3800000,  "Available"),
+    ("Shop",      "Model Town, Ludhiana",     "Shop/Office",200, "Sq Ft",  8000000,  "Available"),
+    ("House",     "Nabha Road, Patiala",      "3BHK",       5,   "Marla",  5500000,  "Available"),
+    ("Apartment", "Sector 32, Chandigarh",    "2BHK",       2,   "Marla",  4800000,  "Reserved"),
+    ("House",     "Sector 11, Mohali",        "4BHK+",      1,   "Kanal",  22000000, "Available"),
+]
+
+
+def _seed_properties(db):
+    for prop_type, location, config, area_val, area_unit, price, status in SEED_PROPERTIES:
+        sqft = to_sqft(area_val, area_unit)
+        db.execute(
+            "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (prop_type, location, config, float(area_val), area_unit, sqft, float(price), status)
+        )
+    db.commit()
+
+
 def init_db():
     db = sqlite3.connect(DB_PATH)
+
+    # Check current schema
+    existing_tables = [r[0] for r in db.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='properties'"
+    ).fetchall()]
+    existing_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()] if existing_tables else []
+
+    # Create properties table (new installs)
     db.execute("""
         CREATE TABLE IF NOT EXISTS properties (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             property_type TEXT NOT NULL,
             location TEXT NOT NULL,
-            size REAL NOT NULL,
+            configuration TEXT NOT NULL DEFAULT 'Other',
+            area_value REAL NOT NULL DEFAULT 0,
+            area_unit TEXT NOT NULL DEFAULT 'Sq Ft',
+            size REAL NOT NULL DEFAULT 0,
             price REAL NOT NULL,
             status TEXT NOT NULL DEFAULT 'Available',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    if existing_cols and 'configuration' not in existing_cols:
+        # Old schema — add missing columns, clear stale seed data, re-seed
+        for stmt in [
+            "ALTER TABLE properties ADD COLUMN configuration TEXT DEFAULT 'Other'",
+            "ALTER TABLE properties ADD COLUMN area_value REAL DEFAULT 0",
+            "ALTER TABLE properties ADD COLUMN area_unit TEXT DEFAULT 'Sq Ft'",
+        ]:
+            try:
+                db.execute(stmt)
+            except Exception:
+                pass
+        db.execute("DELETE FROM properties")
+        _seed_properties(db)
+    elif not existing_cols:
+        # Fresh install — seed
+        _seed_properties(db)
+
     db.execute("""
         CREATE TABLE IF NOT EXISTS inquiries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +147,7 @@ def init_db():
     db.close()
 
 
-# ─── Auth ───────────────────────────────────────────────────────────────────────
+# ─── Auth ────────────────────────────────────────────────────────────────────
 
 def login_required(f):
     @functools.wraps(f)
@@ -115,7 +183,7 @@ def logout():
     return redirect("/login")
 
 
-# ─── Pages ─────────────────────────────────────────────────────────────────────
+# ─── Pages ──────────────────────────────────────────────────────────────────
 
 @app.route("/")
 @login_required
@@ -123,7 +191,7 @@ def index():
     return render_template("index.html", username=session.get("username", ""))
 
 
-# ─── Properties ────────────────────────────────────────────────────────────────
+# ─── Properties ─────────────────────────────────────────────────────────────
 
 def find_matching_buyers(db, prop):
     buyers = [dict(r) for r in db.execute("SELECT * FROM buyers ORDER BY created_at DESC").fetchall()]
@@ -149,19 +217,23 @@ def get_properties():
     q = request.args.get("q", "").strip().lower()
     status_filter = request.args.get("status", "").strip()
     type_filter = request.args.get("type", "").strip()
+    config_filter = request.args.get("config", "").strip()
 
     sql = "SELECT * FROM properties WHERE 1=1"
     params = []
 
     if q:
-        sql += " AND (LOWER(location) LIKE ? OR LOWER(property_type) LIKE ?)"
-        params.extend([f"%{q}%", f"%{q}%"])
+        sql += " AND (LOWER(location) LIKE ? OR LOWER(property_type) LIKE ? OR LOWER(configuration) LIKE ?)"
+        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
     if status_filter:
         sql += " AND status = ?"
         params.append(status_filter)
     if type_filter:
         sql += " AND property_type = ?"
         params.append(type_filter)
+    if config_filter:
+        sql += " AND configuration = ?"
+        params.append(config_filter)
 
     sql += " ORDER BY created_at DESC"
     rows = db.execute(sql, params).fetchall()
@@ -172,14 +244,18 @@ def get_properties():
 @login_required
 def add_property():
     data = request.get_json()
-    required = ["property_type", "location", "size", "price", "status"]
+    required = ["property_type", "location", "configuration", "area_value", "area_unit", "price", "status"]
     if not all(k in data for k in required):
         return jsonify({"error": "Missing required fields"}), 400
 
+    sqft = to_sqft(data["area_value"], data["area_unit"])
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO properties (property_type, location, size, price, status) VALUES (?, ?, ?, ?, ?)",
-        (data["property_type"], data["location"], float(data["size"]), float(data["price"]), data["status"])
+        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (data["property_type"], data["location"], data["configuration"],
+         float(data["area_value"]), data["area_unit"], sqft,
+         float(data["price"]), data["status"])
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -201,17 +277,20 @@ def delete_property(prop_id):
 @login_required
 def update_property(prop_id):
     data = request.get_json()
+    sqft = to_sqft(data["area_value"], data["area_unit"])
     db = get_db()
     db.execute(
-        "UPDATE properties SET property_type=?, location=?, size=?, price=?, status=? WHERE id=?",
-        (data["property_type"], data["location"], float(data["size"]), float(data["price"]), data["status"], prop_id)
+        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=? WHERE id=?",
+        (data["property_type"], data["location"], data["configuration"],
+         float(data["area_value"]), data["area_unit"], sqft,
+         float(data["price"]), data["status"], prop_id)
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
     return jsonify(dict(row))
 
 
-# ─── Inquiries ─────────────────────────────────────────────────────────────────
+# ─── Inquiries ──────────────────────────────────────────────────────────────
 
 @app.route("/api/inquiries", methods=["GET"])
 @login_required
@@ -237,10 +316,8 @@ def get_inquiries():
 @login_required
 def add_inquiry():
     data = request.get_json()
-    required = ["client_name", "whatsapp_message"]
-    if not all(k in data for k in required):
+    if not all(k in data for k in ["client_name", "whatsapp_message"]):
         return jsonify({"error": "Missing required fields"}), 400
-
     matched_ids = json.dumps(data.get("matched_property_ids", []))
     db = get_db()
     cursor = db.execute(
@@ -280,7 +357,7 @@ def update_inquiry(inq_id):
     return jsonify(result)
 
 
-# ─── Buyers ────────────────────────────────────────────────────────────────────
+# ─── Buyers ─────────────────────────────────────────────────────────────────
 
 @app.route("/api/buyers", methods=["GET"])
 @login_required
@@ -333,7 +410,7 @@ def update_buyer(buyer_id):
     return jsonify(dict(row))
 
 
-# ─── Follow-ups ────────────────────────────────────────────────────────────────
+# ─── Follow-ups ─────────────────────────────────────────────────────────────
 
 @app.route("/api/followups", methods=["GET"])
 @login_required
@@ -382,7 +459,7 @@ def update_followup(fu_id):
     return jsonify(dict(row))
 
 
-# ─── AI Parse Property ─────────────────────────────────────────────────────
+# ─── AI Parse Property ──────────────────────────────────────────────────────
 
 @app.route("/api/parse-property", methods=["POST"])
 @login_required
@@ -398,21 +475,32 @@ def parse_property():
         api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
     )
 
-    prompt = f"""You are a real estate data extraction assistant in India. Extract property details from this text:
+    units_list = ", ".join(VALID_UNITS)
+    configs_list = ", ".join(VALID_CONFIGS)
+
+    prompt = f"""You are a real estate data extraction assistant in India (Punjab region). Extract property details from this plain-text description:
 
 "{text}"
 
 Return a JSON object with exactly these fields:
 - "property_type": one of exactly: Apartment, House, Villa, Office, Shop, Land, Warehouse
   (flat/BHK → Apartment; kothi/makan → House; plot/land → Land; dukan/shop → Shop; godown → Warehouse)
-- "location": the area, sector, or city mentioned (string, best guess if unclear)
-- "size": numeric value in sq ft
-  (if only BHK config is given with no sq ft, estimate: 1BHK→600, 2BHK→950, 3BHK→1350, 4BHK→1700)
+- "configuration": one of exactly: {configs_list}
+  (1BHK/2BHK/3BHK/4BHK+ based on bedroom count; shop/office/commercial → Shop/Office; plot/land → Plot; if unclear → Other)
+- "area_value": numeric value of the area (just the number)
+- "area_unit": one of exactly: {units_list}
+  (sq ft/sqft → Sq Ft; sq yard/sq yards → Sq Yards; gaj → Gaj; marla → Marla; kanal → Kanal; bigha → Bigha)
 - "price": numeric value in Rs
   (convert: "lakh" = 100000, "crore" = 10000000; if monthly rent mentioned, use that number directly)
 - "status": one of exactly: Available, Rented, Sold, Reserved
   (rent/for rent/monthly → Rented; sold/bikya → Sold; booked/reserved → Reserved; default → Available)
 - "notes": a brief 1-line note about any assumptions made (empty string if all was clear)
+
+Conversion context (Punjab standard):
+- 1 Marla = 272.25 Sq Ft, 1 Kanal = 5445 Sq Ft, 1 Bigha = 9070 Sq Ft, 1 Sq Yard = 9 Sq Ft, 1 Gaj = 9 Sq Ft
+
+Example: "5 marla plot Sector 22 Chandigarh 25 lakh" →
+{{"property_type": "Land", "configuration": "Plot", "area_value": 5, "area_unit": "Marla", "price": 2500000, "status": "Available", "notes": ""}}
 
 Return ONLY valid JSON, no markdown, no extra text."""
 
@@ -434,16 +522,20 @@ Return ONLY valid JSON, no markdown, no extra text."""
             return jsonify({"error": "Could not parse AI response. Please try rephrasing."}), 500
 
     valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}
-    valid_statuses = {"Available", "Rented", "Sold", "Reserved"}
     if result.get("property_type") not in valid_types:
         result["property_type"] = "Apartment"
-    if result.get("status") not in valid_statuses:
+    if result.get("configuration") not in set(VALID_CONFIGS):
+        result["configuration"] = "Other"
+    if result.get("area_unit") not in set(VALID_UNITS):
+        result["area_unit"] = "Sq Ft"
+    if result.get("status") not in {"Available", "Rented", "Sold", "Reserved"}:
         result["status"] = "Available"
 
+    result["size_sqft"] = to_sqft(result.get("area_value", 0), result.get("area_unit", "Sq Ft"))
     return jsonify(result)
 
 
-# ─── AI Match ──────────────────────────────────────────────────────────────────
+# ─── AI Match ───────────────────────────────────────────────────────────────
 
 @app.route("/api/match", methods=["POST"])
 @login_required
@@ -460,9 +552,17 @@ def match_properties():
     if not inventory:
         return jsonify({"matches": [], "summary": "No properties in inventory to match against."})
 
+    def area_display(p):
+        v = p.get("area_value", 0)
+        u = p.get("area_unit", "Sq Ft")
+        sqft = p.get("size", 0)
+        if u == "Sq Ft":
+            return f"{v:g} Sq Ft"
+        return f"{v:g} {u} ({sqft:g} Sq Ft)"
+
     inventory_text = "\n".join([
-        f"ID {p['id']}: {p['property_type']} in {p['location']}, {p['size']} sq ft, "
-        f"Rs {p['price']:,.0f}, Status: {p['status']}"
+        f"ID {p['id']}: {p['configuration']} {p['property_type']} in {p['location']}, "
+        f"{area_display(p)}, Rs {p['price']:,.0f}, Status: {p['status']}"
         for p in inventory
     ])
 

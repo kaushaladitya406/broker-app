@@ -13,6 +13,41 @@ let lastMatchMessage = "";
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
+const UNIT_TO_SQFT = {
+  "Sq Ft": 1,
+  "Sq Yards": 9,
+  "Gaj": 9,
+  "Marla": 272.25,
+  "Kanal": 5445,
+  "Bigha": 9070,
+};
+
+function toSqft(value, unit) {
+  return Math.round(parseFloat(value) * (UNIT_TO_SQFT[unit] || 1) * 100) / 100;
+}
+
+function formatArea(p) {
+  const v = p.area_value;
+  const u = p.area_unit || "Sq Ft";
+  const sqft = p.size;
+  if (!v && !sqft) return "—";
+  if (!v || u === "Sq Ft") return `${Number(sqft || v).toLocaleString("en-IN")} Sq Ft`;
+  return `${Number(v).toLocaleString("en-IN")} ${u}<br><span class="sqft-sub">${Number(sqft).toLocaleString("en-IN")} Sq Ft</span>`;
+}
+
+function updateAreaConversion(valueId, unitId, displayId) {
+  const val = parseFloat(document.getElementById(valueId)?.value);
+  const unit = document.getElementById(unitId)?.value;
+  const display = document.getElementById(displayId);
+  if (!display) return;
+  if (!isNaN(val) && val > 0 && unit && unit !== "Sq Ft") {
+    const sqft = toSqft(val, unit);
+    display.textContent = `≈ ${Number(sqft).toLocaleString("en-IN")} Sq Ft`;
+  } else {
+    display.textContent = "";
+  }
+}
+
 async function apiFetch(url, opts = {}) {
   const res = await fetch(url, opts);
   if (res.status === 401) { window.location.href = "/login"; return null; }
@@ -69,17 +104,22 @@ function statusBadge(status) {
   return `<span class="badge ${map[status] || "badge-available"}">${status}</span>`;
 }
 
+function configTag(config) {
+  return `<span class="config-tag">${config || "—"}</span>`;
+}
+
 function renderTable(props) {
   const tbody = document.getElementById("propertiesBody");
   if (!Array.isArray(props) || props.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No properties found. Add your first one above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">No properties found. Add your first one above.</td></tr>`;
     return;
   }
   tbody.innerHTML = props.map(p => `
     <tr class="prop-row">
       <td><span class="type-tag">${p.property_type}</span></td>
       <td>${p.location}</td>
-      <td>${Number(p.size).toLocaleString("en-IN")} sq ft</td>
+      <td>${configTag(p.configuration)}</td>
+      <td class="area-cell">${formatArea(p)}</td>
       <td>${formatPrice(p.price)}</td>
       <td>${statusBadge(p.status)}</td>
       <td class="actions-cell">
@@ -94,6 +134,7 @@ function openAddModal() {
   editingId = null;
   document.getElementById("modalTitle").textContent = "Add Property";
   document.getElementById("propForm").reset();
+  document.getElementById("propAreaConversion").textContent = "";
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -104,9 +145,12 @@ function openEditModal(id) {
   document.getElementById("modalTitle").textContent = "Edit Property";
   document.getElementById("propType").value = p.property_type;
   document.getElementById("propLocation").value = p.location;
-  document.getElementById("propSize").value = p.size;
+  document.getElementById("propConfig").value = p.configuration || "Other";
+  document.getElementById("propAreaValue").value = p.area_value || "";
+  document.getElementById("propAreaUnit").value = p.area_unit || "Sq Ft";
   document.getElementById("propPrice").value = p.price;
   document.getElementById("propStatus").value = p.status;
+  updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion");
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -120,7 +164,9 @@ async function saveProperty(e) {
   const payload = {
     property_type: document.getElementById("propType").value,
     location: document.getElementById("propLocation").value,
-    size: parseFloat(document.getElementById("propSize").value),
+    configuration: document.getElementById("propConfig").value,
+    area_value: parseFloat(document.getElementById("propAreaValue").value),
+    area_unit: document.getElementById("propAreaUnit").value,
     price: parseFloat(document.getElementById("propPrice").value),
     status: document.getElementById("propStatus").value,
   };
@@ -213,10 +259,14 @@ async function matchProperties() {
       html += `<div class="match-count">${matches.length} match${matches.length !== 1 ? "es" : ""} found</div>`;
       html += `<div class="match-list">` + matches.map(p => `
         <div class="match-card">
-          <div class="match-card-header"><span class="type-tag">${p.property_type}</span>${statusBadge(p.status)}</div>
+          <div class="match-card-header">
+            <span class="config-tag">${p.configuration || ""}</span>
+            <span class="type-tag">${p.property_type}</span>
+            ${statusBadge(p.status)}
+          </div>
           <div class="match-card-location">📍 ${p.location}</div>
           <div class="match-card-details">
-            <span>📐 ${Number(p.size).toLocaleString("en-IN")} sq ft</span>
+            <span>📐 ${p.area_value ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit}` : `${Number(p.size).toLocaleString("en-IN")} Sq Ft`}</span>
             <span>💰 ${formatPrice(p.price)}</span>
           </div>
         </div>
@@ -606,6 +656,15 @@ async function parsePropertyText() {
 
 function renderConfirmCard(p) {
   const resultDiv = document.getElementById("parseResult");
+  const CONFIGS = ["1BHK","2BHK","3BHK","4BHK+","Shop/Office","Plot","Other"];
+  const TYPES = ["Apartment","House","Villa","Office","Shop","Land","Warehouse"];
+  const UNITS = ["Sq Ft","Sq Yards","Gaj","Marla","Kanal","Bigha"];
+  const STATUSES = ["Available","Reserved","Sold","Rented"];
+
+  const initSqft = p.area_value && p.area_unit && p.area_unit !== "Sq Ft"
+    ? `≈ ${Number(toSqft(p.area_value, p.area_unit)).toLocaleString("en-IN")} Sq Ft`
+    : "";
+
   resultDiv.innerHTML = `
     <div class="confirm-card">
       <div class="confirm-card-title">
@@ -616,20 +675,33 @@ function renderConfirmCard(p) {
       ${p.notes ? `<div class="confirm-assumption">${p.notes}</div>` : ""}
       <div class="confirm-fields">
         <div class="confirm-field">
-          <label>Property Type</label>
-          <select id="confirmType">
-            ${["Apartment","House","Villa","Office","Shop","Land","Warehouse"].map(t =>
-              `<option ${t === p.property_type ? "selected" : ""}>${t}</option>`
-            ).join("")}
+          <label>Configuration</label>
+          <select id="confirmConfig">
+            ${CONFIGS.map(c => `<option ${c === p.configuration ? "selected" : ""}>${c}</option>`).join("")}
           </select>
         </div>
         <div class="confirm-field">
+          <label>Property Type</label>
+          <select id="confirmType">
+            ${TYPES.map(t => `<option ${t === p.property_type ? "selected" : ""}>${t}</option>`).join("")}
+          </select>
+        </div>
+        <div class="confirm-field" style="grid-column:1/-1">
           <label>Location</label>
           <input type="text" id="confirmLocation" value="${p.location || ""}" />
         </div>
-        <div class="confirm-field">
-          <label>Size (sq ft)</label>
-          <input type="number" id="confirmSize" value="${p.size || ""}" min="1" />
+        <div class="confirm-field" style="grid-column:1/-1">
+          <label>Area</label>
+          <div class="area-input-row">
+            <input type="number" id="confirmAreaValue" value="${p.area_value || ""}" min="0.01" step="0.01"
+              oninput="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')"
+            />
+            <select id="confirmAreaUnit"
+              onchange="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')">
+              ${UNITS.map(u => `<option ${u === p.area_unit ? "selected" : ""}>${u}</option>`).join("")}
+            </select>
+          </div>
+          <div class="area-conversion" id="confirmAreaConv">${initSqft}</div>
         </div>
         <div class="confirm-field">
           <label>Price (Rs)</label>
@@ -638,9 +710,7 @@ function renderConfirmCard(p) {
         <div class="confirm-field">
           <label>Status</label>
           <select id="confirmStatus">
-            ${["Available","Reserved","Sold","Rented"].map(s =>
-              `<option ${s === p.status ? "selected" : ""}>${s}</option>`
-            ).join("")}
+            ${STATUSES.map(s => `<option ${s === p.status ? "selected" : ""}>${s}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -662,11 +732,13 @@ async function saveParsedProperty() {
   const payload = {
     property_type: document.getElementById("confirmType").value,
     location: document.getElementById("confirmLocation").value.trim(),
-    size: parseFloat(document.getElementById("confirmSize").value),
+    configuration: document.getElementById("confirmConfig").value,
+    area_value: parseFloat(document.getElementById("confirmAreaValue").value),
+    area_unit: document.getElementById("confirmAreaUnit").value,
     price: parseFloat(document.getElementById("confirmPrice").value),
     status: document.getElementById("confirmStatus").value,
   };
-  if (!payload.location || isNaN(payload.size) || isNaN(payload.price)) {
+  if (!payload.location || isNaN(payload.area_value) || isNaN(payload.price)) {
     alert("Please fill in all fields before adding.");
     return;
   }
@@ -703,6 +775,11 @@ document.getElementById("editInquiryForm").addEventListener("submit", updateInqu
 document.getElementById("inqStatusFilter").addEventListener("change", fetchInquiries);
 document.getElementById("buyerForm").addEventListener("submit", saveBuyer);
 document.getElementById("followupForm").addEventListener("submit", saveFollowup);
+
+document.getElementById("propAreaValue").addEventListener("input", () =>
+  updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion"));
+document.getElementById("propAreaUnit").addEventListener("change", () =>
+  updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion"));
 
 ["propModal","saveInquiryModal","editInquiryModal","addBuyerModal","addFollowupModal","buyerMatchModal"].forEach(id => {
   document.getElementById(id).addEventListener("click", function(e) { if (e.target === this) this.classList.remove("open"); });
