@@ -562,6 +562,136 @@ async function deleteFollowup(id) {
   await fetchFollowups();
 }
 
+// ─── Quick Add via AI ─────────────────────────────────────────────────────────
+
+let parsedProperty = null;
+
+function toggleQuickAdd() {
+  const body = document.getElementById("quickAddBody");
+  const btn = document.getElementById("quickAddToggle");
+  const isHidden = body.style.display === "none";
+  body.style.display = isHidden ? "block" : "none";
+  btn.textContent = isHidden ? "▲ Hide" : "▼ Show";
+}
+
+async function parsePropertyText() {
+  const text = document.getElementById("quickAddText").value.trim();
+  if (!text) return;
+  const btn = document.getElementById("parseBtn");
+  const resultDiv = document.getElementById("parseResult");
+  btn.disabled = true;
+  btn.textContent = "Parsing...";
+  resultDiv.innerHTML = `<div class="parse-loading"><div class="spinner" style="border-top-color:var(--purple)"></div><p>AI is reading your description…</p></div>`;
+  try {
+    const res = await apiFetch(`${API}/api/parse-property`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    if (!res) return;
+    const data = await res.json();
+    if (data.error) {
+      resultDiv.innerHTML = `<p class="parse-error">⚠️ ${data.error}</p>`;
+      return;
+    }
+    parsedProperty = data;
+    renderConfirmCard(data);
+  } catch (err) {
+    resultDiv.innerHTML = `<p class="parse-error">⚠️ Error connecting to AI. Please try again.</p>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "✨ Parse with AI";
+  }
+}
+
+function renderConfirmCard(p) {
+  const resultDiv = document.getElementById("parseResult");
+  resultDiv.innerHTML = `
+    <div class="confirm-card">
+      <div class="confirm-card-title">
+        <span class="confirm-card-icon">🔍</span>
+        <span>Confirm extracted details</span>
+        ${p.notes ? `<span class="confirm-note" title="${p.notes}">ℹ️ AI made some assumptions</span>` : ""}
+      </div>
+      ${p.notes ? `<div class="confirm-assumption">${p.notes}</div>` : ""}
+      <div class="confirm-fields">
+        <div class="confirm-field">
+          <label>Property Type</label>
+          <select id="confirmType">
+            ${["Apartment","House","Villa","Office","Shop","Land","Warehouse"].map(t =>
+              `<option ${t === p.property_type ? "selected" : ""}>${t}</option>`
+            ).join("")}
+          </select>
+        </div>
+        <div class="confirm-field">
+          <label>Location</label>
+          <input type="text" id="confirmLocation" value="${p.location || ""}" />
+        </div>
+        <div class="confirm-field">
+          <label>Size (sq ft)</label>
+          <input type="number" id="confirmSize" value="${p.size || ""}" min="1" />
+        </div>
+        <div class="confirm-field">
+          <label>Price (Rs)</label>
+          <input type="number" id="confirmPrice" value="${p.price || ""}" min="0" />
+        </div>
+        <div class="confirm-field">
+          <label>Status</label>
+          <select id="confirmStatus">
+            ${["Available","Reserved","Sold","Rented"].map(s =>
+              `<option ${s === p.status ? "selected" : ""}>${s}</option>`
+            ).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn-cancel" onclick="discardParsed()">✕ Discard</button>
+        <button class="btn-primary" id="confirmAddBtn" onclick="saveParsedProperty()">✅ Add to Inventory</button>
+      </div>
+    </div>
+  `;
+}
+
+function discardParsed() {
+  parsedProperty = null;
+  document.getElementById("parseResult").innerHTML = "";
+  document.getElementById("quickAddText").value = "";
+}
+
+async function saveParsedProperty() {
+  const payload = {
+    property_type: document.getElementById("confirmType").value,
+    location: document.getElementById("confirmLocation").value.trim(),
+    size: parseFloat(document.getElementById("confirmSize").value),
+    price: parseFloat(document.getElementById("confirmPrice").value),
+    status: document.getElementById("confirmStatus").value,
+  };
+  if (!payload.location || isNaN(payload.size) || isNaN(payload.price)) {
+    alert("Please fill in all fields before adding.");
+    return;
+  }
+  const btn = document.getElementById("confirmAddBtn");
+  btn.disabled = true;
+  btn.textContent = "Adding...";
+  try {
+    const res = await apiFetch(`${API}/api/properties`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res) return;
+    const data = await res.json();
+    discardParsed();
+    await fetchProperties();
+    if (data.buyer_matches && data.buyer_matches.length > 0) {
+      showBuyerMatchModal(data.buyer_matches, data.property);
+    }
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = "✅ Add to Inventory";
+  }
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 document.getElementById("searchInput").addEventListener("input", fetchProperties);

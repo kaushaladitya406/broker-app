@@ -34,6 +34,23 @@
 
   <!-- ─── INVENTORY TAB ─────────────────────────────── -->
   <div class="tab-panel active" id="panel-inventory">
+
+    <!-- Quick Add via AI -->
+    <div class="quick-add-section">
+      <div class="quick-add-header" onclick="toggleQuickAdd()">
+        <div>
+          <div class="quick-add-title">✨ Quick Add via AI</div>
+          <div class="quick-add-hint">Type a property description in plain English — AI will extract the details</div>
+        </div>
+        <button class="quick-add-toggle" id="quickAddToggle">▲ Hide</button>
+      </div>
+      <div class="quick-add-body" id="quickAddBody">
+        <textarea id="quickAddText" class="quick-add-textarea" placeholder="e.g. '3BHK flat Sector 22 Chandigarh 15000 rent available'&#10;or '2BHK apartment Urban Estate Patiala 8000 per month'&#10;or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
+        <button class="parse-btn" id="parseBtn" onclick="parsePropertyText()">✨ Parse with AI</button>
+        <div id="parseResult"></div>
+      </div>
+    </div>
+
     <div class="stats-grid">
       <div class="stat-card">
         <div class="stat-icon blue">🏘️</div>

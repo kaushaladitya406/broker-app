@@ -382,6 +382,67 @@ def update_followup(fu_id):
     return jsonify(dict(row))
 
 
+# ─── AI Parse Property ─────────────────────────────────────────────────────
+
+@app.route("/api/parse-property", methods=["POST"])
+@login_required
+def parse_property():
+    data = request.get_json()
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify({"error": "No text provided"}), 400
+
+    from openai import OpenAI
+    client = OpenAI(
+        base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
+        api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
+    )
+
+    prompt = f"""You are a real estate data extraction assistant in India. Extract property details from this text:
+
+"{text}"
+
+Return a JSON object with exactly these fields:
+- "property_type": one of exactly: Apartment, House, Villa, Office, Shop, Land, Warehouse
+  (flat/BHK → Apartment; kothi/makan → House; plot/land → Land; dukan/shop → Shop; godown → Warehouse)
+- "location": the area, sector, or city mentioned (string, best guess if unclear)
+- "size": numeric value in sq ft
+  (if only BHK config is given with no sq ft, estimate: 1BHK→600, 2BHK→950, 3BHK→1350, 4BHK→1700)
+- "price": numeric value in Rs
+  (convert: "lakh" = 100000, "crore" = 10000000; if monthly rent mentioned, use that number directly)
+- "status": one of exactly: Available, Rented, Sold, Reserved
+  (rent/for rent/monthly → Rented; sold/bikya → Sold; booked/reserved → Reserved; default → Available)
+- "notes": a brief 1-line note about any assumptions made (empty string if all was clear)
+
+Return ONLY valid JSON, no markdown, no extra text."""
+
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        max_completion_tokens=512,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    raw = response.choices[0].message.content.strip()
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError:
+        import re
+        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if json_match:
+            result = json.loads(json_match.group())
+        else:
+            return jsonify({"error": "Could not parse AI response. Please try rephrasing."}), 500
+
+    valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}
+    valid_statuses = {"Available", "Rented", "Sold", "Reserved"}
+    if result.get("property_type") not in valid_types:
+        result["property_type"] = "Apartment"
+    if result.get("status") not in valid_statuses:
+        result["status"] = "Available"
+
+    return jsonify(result)
+
+
 # ─── AI Match ──────────────────────────────────────────────────────────────────
 
 @app.route("/api/match", methods=["POST"])
