@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BrokerApp — Login</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f3f6fb;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.10);
+      padding: 40px 36px 36px;
+      width: 100%;
+      max-width: 380px;
+    }
+    .login-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .login-logo-icon {
+      width: 48px; height: 48px;
+      background: #1a56db;
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+    }
+    .login-logo-text h1 { font-size: 22px; font-weight: 700; color: #1a202c; }
+    .login-logo-text p { font-size: 13px; color: #6b7280; margin-top: 2px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%;
+      border: 1.5px solid #e4e8f0;
+      border-radius: 8px;
+      padding: 11px 14px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s;
+      background: #f3f6fb;
+      color: #1a202c;
+    }
+    .form-group input:focus { border-color: #1a56db; background: #fff; }
+    .error-msg {
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+    .login-btn {
+      width: 100%;
+      background: #1a56db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 6px;
+      transition: background 0.15s;
+    }
+    .login-btn:hover { background: #1340b0; }
+    .login-hint {
+      margin-top: 18px;
+      font-size: 12px;
+      color: #9ca3af;
+      text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">🏠</div>
+      <div class="login-logo-text">
+        <h1>BrokerApp</h1>
+        <p>Property Management Dashboard</p>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/login">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" name="username" placeholder="Enter username" autofocus required />
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter password" required />
+      </div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+
+    <p class="login-hint">Change your credentials via the BROKER_USERNAME and BROKER_PASSWORD environment variables.</p>
+  </div>
+</body>
+</html>

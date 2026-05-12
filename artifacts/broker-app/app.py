@@ -1,11 +1,18 @@
 import os
 import json
 import sqlite3
-from flask import Flask, request, jsonify, render_template, g
+import functools
+from flask import Flask, request, jsonify, render_template, g, session, redirect, url_for
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-change-me")
 DB_PATH = os.path.join(os.path.dirname(__file__), "broker.db")
 
+BROKER_USERNAME = os.environ.get("BROKER_USERNAME", "admin")
+BROKER_PASSWORD = os.environ.get("BROKER_PASSWORD", "broker123")
+
+
+# ─── DB helpers ────────────────────────────────────────────────────────────────
 
 def get_db():
     if "db" not in g:
@@ -45,16 +52,98 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS buyers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            property_type TEXT DEFAULT '',
+            location TEXT DEFAULT '',
+            budget_min REAL DEFAULT 0,
+            budget_max REAL DEFAULT 0,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS followups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            client_name TEXT NOT NULL,
+            note TEXT NOT NULL,
+            reminder_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
     db.commit()
     db.close()
 
 
+# ─── Auth ───────────────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @functools.wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "Unauthorized"}), 401
+            return redirect("/login")
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("logged_in"):
+        return redirect("/")
+    error = None
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+        if username == BROKER_USERNAME and password == BROKER_PASSWORD:
+            session["logged_in"] = True
+            session["username"] = username
+            return redirect("/")
+        else:
+            error = "Invalid username or password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
+
+
+# ─── Pages ─────────────────────────────────────────────────────────────────────
+
 @app.route("/")
+@login_required
 def index():
-    return render_template("index.html")
+    return render_template("index.html", username=session.get("username", ""))
+
+
+# ─── Properties ────────────────────────────────────────────────────────────────
+
+def find_matching_buyers(db, prop):
+    buyers = [dict(r) for r in db.execute("SELECT * FROM buyers ORDER BY created_at DESC").fetchall()]
+    matches = []
+    for b in buyers:
+        if b["property_type"] and b["property_type"] != prop["property_type"]:
+            continue
+        if b["location"] and b["location"].strip().lower() not in prop["location"].lower():
+            continue
+        price = prop["price"]
+        if b["budget_min"] and b["budget_min"] > 0 and price < b["budget_min"]:
+            continue
+        if b["budget_max"] and b["budget_max"] > 0 and price > b["budget_max"]:
+            continue
+        matches.append(b)
+    return matches
 
 
 @app.route("/api/properties", methods=["GET"])
+@login_required
 def get_properties():
     db = get_db()
     q = request.args.get("q", "").strip().lower()
@@ -80,6 +169,7 @@ def get_properties():
 
 
 @app.route("/api/properties", methods=["POST"])
+@login_required
 def add_property():
     data = request.get_json()
     required = ["property_type", "location", "size", "price", "status"]
@@ -93,10 +183,13 @@ def add_property():
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
+    prop = dict(row)
+    buyer_matches = find_matching_buyers(db, prop)
+    return jsonify({"property": prop, "buyer_matches": buyer_matches}), 201
 
 
 @app.route("/api/properties/<int:prop_id>", methods=["DELETE"])
+@login_required
 def delete_property(prop_id):
     db = get_db()
     db.execute("DELETE FROM properties WHERE id = ?", (prop_id,))
@@ -105,6 +198,7 @@ def delete_property(prop_id):
 
 
 @app.route("/api/properties/<int:prop_id>", methods=["PUT"])
+@login_required
 def update_property(prop_id):
     data = request.get_json()
     db = get_db()
@@ -117,7 +211,10 @@ def update_property(prop_id):
     return jsonify(dict(row))
 
 
+# ─── Inquiries ─────────────────────────────────────────────────────────────────
+
 @app.route("/api/inquiries", methods=["GET"])
+@login_required
 def get_inquiries():
     db = get_db()
     status_filter = request.args.get("status", "").strip()
@@ -137,6 +234,7 @@ def get_inquiries():
 
 
 @app.route("/api/inquiries", methods=["POST"])
+@login_required
 def add_inquiry():
     data = request.get_json()
     required = ["client_name", "whatsapp_message"]
@@ -147,13 +245,8 @@ def add_inquiry():
     db = get_db()
     cursor = db.execute(
         "INSERT INTO inquiries (client_name, whatsapp_message, matched_property_ids, notes, status) VALUES (?, ?, ?, ?, ?)",
-        (
-            data["client_name"],
-            data["whatsapp_message"],
-            matched_ids,
-            data.get("notes", ""),
-            data.get("status", "New"),
-        )
+        (data["client_name"], data["whatsapp_message"], matched_ids,
+         data.get("notes", ""), data.get("status", "New"))
     )
     db.commit()
     row = db.execute("SELECT * FROM inquiries WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -163,6 +256,7 @@ def add_inquiry():
 
 
 @app.route("/api/inquiries/<int:inq_id>", methods=["DELETE"])
+@login_required
 def delete_inquiry(inq_id):
     db = get_db()
     db.execute("DELETE FROM inquiries WHERE id = ?", (inq_id,))
@@ -171,6 +265,7 @@ def delete_inquiry(inq_id):
 
 
 @app.route("/api/inquiries/<int:inq_id>", methods=["PUT"])
+@login_required
 def update_inquiry(inq_id):
     data = request.get_json()
     db = get_db()
@@ -185,7 +280,112 @@ def update_inquiry(inq_id):
     return jsonify(result)
 
 
+# ─── Buyers ────────────────────────────────────────────────────────────────────
+
+@app.route("/api/buyers", methods=["GET"])
+@login_required
+def get_buyers():
+    db = get_db()
+    rows = db.execute("SELECT * FROM buyers ORDER BY created_at DESC").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/buyers", methods=["POST"])
+@login_required
+def add_buyer():
+    data = request.get_json()
+    if not data.get("name") or not data.get("phone"):
+        return jsonify({"error": "Name and phone are required"}), 400
+    db = get_db()
+    cursor = db.execute(
+        "INSERT INTO buyers (name, phone, property_type, location, budget_min, budget_max, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (data["name"], data["phone"], data.get("property_type", ""),
+         data.get("location", ""), float(data.get("budget_min") or 0),
+         float(data.get("budget_max") or 0), data.get("notes", ""))
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM buyers WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.route("/api/buyers/<int:buyer_id>", methods=["DELETE"])
+@login_required
+def delete_buyer(buyer_id):
+    db = get_db()
+    db.execute("DELETE FROM buyers WHERE id = ?", (buyer_id,))
+    db.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/buyers/<int:buyer_id>", methods=["PUT"])
+@login_required
+def update_buyer(buyer_id):
+    data = request.get_json()
+    db = get_db()
+    db.execute(
+        "UPDATE buyers SET name=?, phone=?, property_type=?, location=?, budget_min=?, budget_max=?, notes=? WHERE id=?",
+        (data["name"], data["phone"], data.get("property_type", ""),
+         data.get("location", ""), float(data.get("budget_min") or 0),
+         float(data.get("budget_max") or 0), data.get("notes", ""), buyer_id)
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM buyers WHERE id = ?", (buyer_id,)).fetchone()
+    return jsonify(dict(row))
+
+
+# ─── Follow-ups ────────────────────────────────────────────────────────────────
+
+@app.route("/api/followups", methods=["GET"])
+@login_required
+def get_followups():
+    db = get_db()
+    rows = db.execute("SELECT * FROM followups ORDER BY reminder_date ASC, created_at DESC").fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/followups", methods=["POST"])
+@login_required
+def add_followup():
+    data = request.get_json()
+    if not data.get("client_name") or not data.get("note") or not data.get("reminder_date"):
+        return jsonify({"error": "client_name, note, and reminder_date are required"}), 400
+    db = get_db()
+    cursor = db.execute(
+        "INSERT INTO followups (client_name, note, reminder_date, status) VALUES (?, ?, ?, ?)",
+        (data["client_name"], data["note"], data["reminder_date"], data.get("status", "Pending"))
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM followups WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.route("/api/followups/<int:fu_id>", methods=["DELETE"])
+@login_required
+def delete_followup(fu_id):
+    db = get_db()
+    db.execute("DELETE FROM followups WHERE id = ?", (fu_id,))
+    db.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/followups/<int:fu_id>", methods=["PUT"])
+@login_required
+def update_followup(fu_id):
+    data = request.get_json()
+    db = get_db()
+    db.execute(
+        "UPDATE followups SET client_name=?, note=?, reminder_date=?, status=? WHERE id=?",
+        (data["client_name"], data["note"], data["reminder_date"], data["status"], fu_id)
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM followups WHERE id = ?", (fu_id,)).fetchone()
+    return jsonify(dict(row))
+
+
+# ─── AI Match ──────────────────────────────────────────────────────────────────
+
 @app.route("/api/match", methods=["POST"])
+@login_required
 def match_properties():
     data = request.get_json()
     message = data.get("message", "").strip()
