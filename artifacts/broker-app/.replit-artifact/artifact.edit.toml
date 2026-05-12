@@ -1,0 +1,22 @@
+kind = "web"
+  previewPath = "/"
+  title = "BrokerApp"
+  version = "1.0.0"
+  id = "broker-app-001"
+
+  [[services]]
+  localPort = 8000
+  name = "BrokerApp"
+  paths = ["/"]
+
+  [services.development]
+  run = "python artifacts/broker-app/app.py"
+
+  [services.production]
+
+  [services.production.run]
+  args = ["python", "artifacts/broker-app/app.py"]
+
+  [services.production.run.env]
+  PORT = "8000"
+  
