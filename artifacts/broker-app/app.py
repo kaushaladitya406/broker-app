@@ -545,16 +545,64 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
         messages=[{"role": "user", "content": prompt}],
     )
 
+    import re
+
     raw = response.choices[0].message.content.strip()
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError:
-        import re
-        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
-        if json_match:
-            result = json.loads(json_match.group())
-        else:
-            return jsonify({"error": "Could not parse AI response. Please try rephrasing."}), 500
+
+    def extract_json(text):
+        """Try every strategy to get a dict out of an AI response string."""
+        # 1. Direct parse
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. Strip markdown code fences  (```json ... ``` or ``` ... ```)
+        stripped = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.IGNORECASE)
+        stripped = re.sub(r'\s*```$', '', stripped.strip())
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+
+        # 3. Find the outermost { ... } block (handles text before/after JSON)
+        brace_match = re.search(r'\{[\s\S]*\}', text)
+        if brace_match:
+            try:
+                return json.loads(brace_match.group())
+            except json.JSONDecodeError:
+                pass
+
+        # 4. Find first { and last } and try the slice
+        start = text.find('{')
+        end = text.rfind('}')
+        if start != -1 and end != -1 and end > start:
+            try:
+                return json.loads(text[start:end + 1])
+            except json.JSONDecodeError:
+                pass
+
+        return None
+
+    result = extract_json(raw)
+    if result is None:
+        # Build a best-effort result from what we know (the input text) so the
+        # broker is never left with a hard error — they can correct fields manually.
+        print(f"[parse-property] Failed to parse AI response: {raw[:300]}")
+        return jsonify({
+            "error": "AI returned an unexpected format. Please check the fields below and correct any blanks.",
+            "raw": raw[:500],
+            "property_type": "Apartment",
+            "configuration": "Other",
+            "location": "",
+            "area_value": 0,
+            "area_unit": "Sq Ft",
+            "price": 0,
+            "status": "Available",
+            "notes": "",
+            "assumptions": "Could not auto-extract — please fill in manually.",
+            "size_sqft": 0,
+        }), 200  # 200 so the frontend shows the editable card rather than an alert
 
     # Validate and sanitise
     valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}

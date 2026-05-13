@@ -803,7 +803,8 @@ async function parsePropertyText() {
     });
     if (!res) return;
     const data = await res.json();
-    if (data.error) {
+    if (data.error && !data.property_type) {
+      // Hard error — AI completely failed, no fields to show
       resultDiv.innerHTML = `<p class="parse-error">⚠️ ${data.error}</p>`;
       return;
     }
