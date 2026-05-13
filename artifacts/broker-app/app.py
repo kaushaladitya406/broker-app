@@ -494,35 +494,54 @@ def parse_property():
     units_list = ", ".join(VALID_UNITS)
     configs_list = ", ".join(VALID_CONFIGS)
 
-    prompt = f"""You are a real estate data extraction assistant in India (Punjab region). Extract property details from this plain-text description:
+    prompt = f"""You are a real estate data extraction assistant in India (Punjab region).
+Extract property details from this plain-text description and return EXACTLY the JSON object described.
 
-"{text}"
+Input: "{text}"
 
-Return a JSON object with exactly these fields:
-- "property_type": one of exactly: Apartment, House, Villa, Office, Shop, Land, Warehouse
-  (flat/BHK → Apartment; kothi/makan → House; plot/land → Land; dukan/shop → Shop; godown → Warehouse)
-- "configuration": one of exactly: {configs_list}
-  (1BHK/2BHK/3BHK/4BHK+ based on bedroom count; shop/office/commercial → Shop/Office; plot/land → Plot; if unclear → Other)
-- "area_value": numeric value of the area (just the number)
-- "area_unit": one of exactly: {units_list}
-  (sq ft/sqft → Sq Ft; sq yard/sq yards → Sq Yards; gaj → Gaj; marla → Marla; kanal → Kanal; bigha → Bigha)
-- "price": numeric value in Rs
-  (convert: "lakh" = 100000, "crore" = 10000000; if monthly rent mentioned, use that number directly)
-- "status": one of exactly: Available, Rented, Sold, Reserved
-  (rent/for rent/monthly → Rented; sold/bikya → Sold; booked/reserved → Reserved; default → Available)
-- "notes": a brief 1-line note about any assumptions made (empty string if all was clear)
+Return a JSON object with EXACTLY these 9 fields:
 
-Conversion context (Punjab standard):
-- 1 Marla = 272.25 Sq Ft, 1 Kanal = 5445 Sq Ft, 1 Bigha = 9070 Sq Ft, 1 Sq Yard = 9 Sq Ft, 1 Gaj = 9 Sq Ft
+1. "property_type": one of: Apartment, House, Villa, Office, Shop, Land, Warehouse
+   (flat/BHK/apartment → Apartment; kothi/makan → House; plot/zameen → Land; dukan/shop → Shop; godown → Warehouse)
 
-Example: "5 marla plot Sector 22 Chandigarh 25 lakh" →
-{{"property_type": "Land", "configuration": "Plot", "area_value": 5, "area_unit": "Marla", "price": 2500000, "status": "Available", "notes": ""}}
+2. "configuration": one of: {configs_list}
+   (1BHK/2BHK/3BHK/4BHK+ by bedroom count; shop/commercial/office → Shop/Office; plot/land → Plot; else → Other)
 
-Return ONLY valid JSON, no markdown, no extra text."""
+3. "location": the area/sector/city mentioned — extract the FULL location string, e.g. "Sector 22, Chandigarh" or "Phase 7, Mohali"
+   IMPORTANT: Always extract this. If only a city is mentioned, use just the city name.
+
+4. "area_value": the NUMERIC area value ONLY — a plain number like 6 or 1200
+   IMPORTANT: This must ALWAYS be a number, never null or missing. Extract the number before the unit.
+
+5. "area_unit": one of: {units_list}
+   (sq ft/sqft → Sq Ft; sq yards → Sq Yards; gaj → Gaj; marla → Marla; kanal → Kanal; bigha → Bigha)
+
+6. "price": the price as a plain INTEGER in rupees — no decimals, no commas
+   PRICE CONVERSION RULES (use exact integer arithmetic):
+   - X lakh  = X × 100000   → "70 lakh" = 7000000, "25 lakh" = 2500000, "1.5 lakh" = 150000
+   - X crore = X × 10000000 → "1.5 crore" = 15000000, "2 crore" = 20000000, "1.2 crore" = 12000000
+   - Monthly rent: use the monthly figure directly (e.g. "15000 rent" = 15000)
+   IMPORTANT: Always return a whole integer. Never use floating point.
+
+7. "status": one of: Available, Rented, Sold, Reserved
+   (for rent/monthly/kiraya → Rented; sold/bikya → Sold; booked/reserved → Reserved; default → Available)
+
+8. "features": a comma-separated string of property amenities and features extracted from the text
+   Examples: "East facing, lift, covered parking, gated society, newly renovated, corner plot"
+   Leave as empty string "" if no features/amenities are mentioned.
+
+9. "assumptions": a brief note about any major assumptions you had to make
+   Leave as empty string "" if everything was clearly stated in the text.
+
+EXAMPLE:
+Input: "3BHK apartment Sector 22 Chandigarh 6 Marla 70 lakh available east facing with lift covered parking gated society"
+Output: {{"property_type": "Apartment", "configuration": "3BHK", "location": "Sector 22, Chandigarh", "area_value": 6, "area_unit": "Marla", "price": 7000000, "status": "Available", "features": "East facing, lift, covered parking, gated society", "assumptions": ""}}
+
+Return ONLY valid JSON. No markdown, no code blocks, no extra text before or after."""
 
     response = client.chat.completions.create(
         model="gpt-5-mini",
-        max_completion_tokens=512,
+        max_completion_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
 
@@ -537,6 +556,7 @@ Return ONLY valid JSON, no markdown, no extra text."""
         else:
             return jsonify({"error": "Could not parse AI response. Please try rephrasing."}), 500
 
+    # Validate and sanitise
     valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}
     if result.get("property_type") not in valid_types:
         result["property_type"] = "Apartment"
@@ -547,7 +567,22 @@ Return ONLY valid JSON, no markdown, no extra text."""
     if result.get("status") not in {"Available", "Rented", "Sold", "Reserved"}:
         result["status"] = "Available"
 
-    result["size_sqft"] = to_sqft(result.get("area_value", 0), result.get("area_unit", "Sq Ft"))
+    # Guarantee area_value is a usable number
+    try:
+        result["area_value"] = float(result["area_value"]) if result.get("area_value") else 0.0
+    except (TypeError, ValueError):
+        result["area_value"] = 0.0
+
+    # Round price to a clean integer (eliminates floating-point drift like 7000003.2)
+    try:
+        result["price"] = int(round(float(result.get("price", 0))))
+    except (TypeError, ValueError):
+        result["price"] = 0
+
+    # Map "features" → "notes" for the property notes field
+    result["notes"] = result.pop("features", "") or ""
+
+    result["size_sqft"] = to_sqft(result["area_value"], result.get("area_unit", "Sq Ft"))
     return jsonify(result)
 
 

@@ -833,9 +833,9 @@ function renderConfirmCard(p) {
       <div class="confirm-card-title">
         <span class="confirm-card-icon">🔍</span>
         <span>Confirm extracted details</span>
-        ${p.notes ? `<span class="confirm-note" title="${p.notes}">ℹ️ AI made some assumptions</span>` : ""}
+        ${p.assumptions ? `<span class="confirm-note" title="${p.assumptions}">ℹ️ AI made some assumptions</span>` : ""}
       </div>
-      ${p.notes ? `<div class="confirm-assumption">${p.notes}</div>` : ""}
+      ${p.assumptions ? `<div class="confirm-assumption">${p.assumptions}</div>` : ""}
       <div class="confirm-fields">
         <div class="confirm-field">
           <label>Configuration</label>
@@ -851,13 +851,14 @@ function renderConfirmCard(p) {
         </div>
         <div class="confirm-field" style="grid-column:1/-1">
           <label>Location</label>
-          <input type="text" id="confirmLocation" value="${p.location || ""}" />
+          <input type="text" id="confirmLocation" value="${(p.location || "").replace(/"/g, "&quot;")}" placeholder="e.g. Sector 22, Chandigarh" />
         </div>
         <div class="confirm-field" style="grid-column:1/-1">
           <label>Area</label>
           <div class="area-input-row">
-            <input type="number" id="confirmAreaValue" value="${p.area_value || ""}" min="0.01" step="0.01"
+            <input type="number" id="confirmAreaValue" value="${p.area_value > 0 ? p.area_value : ""}" min="0.01" step="0.01"
               oninput="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')"
+              placeholder="e.g. 6"
             />
             <select id="confirmAreaUnit"
               onchange="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')">
@@ -868,13 +869,17 @@ function renderConfirmCard(p) {
         </div>
         <div class="confirm-field">
           <label>Price (Rs)</label>
-          <input type="number" id="confirmPrice" value="${p.price || ""}" min="0" />
+          <input type="number" id="confirmPrice" value="${p.price > 0 ? p.price : ""}" min="0" placeholder="e.g. 7000000" />
         </div>
         <div class="confirm-field">
           <label>Status</label>
           <select id="confirmStatus">
             ${STATUSES.map(s => `<option ${s === p.status ? "selected" : ""}>${s}</option>`).join("")}
           </select>
+        </div>
+        <div class="confirm-field" style="grid-column:1/-1">
+          <label>Notes / Features <span style="font-size:11px;color:#6b7280;font-weight:400;">(auto-extracted)</span></label>
+          <textarea id="confirmNotes" rows="2" style="width:100%;border:1.5px solid #e5e7eb;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;resize:vertical;outline:none;box-sizing:border-box;" placeholder="e.g. East facing, lift, covered parking, gated society">${p.notes || ""}</textarea>
         </div>
       </div>
       <div class="confirm-actions">
@@ -900,7 +905,7 @@ async function saveParsedProperty() {
     area_unit: document.getElementById("confirmAreaUnit").value,
     price: parseFloat(document.getElementById("confirmPrice").value),
     status: document.getElementById("confirmStatus").value,
-    notes: "",
+    notes: document.getElementById("confirmNotes")?.value?.trim() || "",
   };
   if (!payload.location || isNaN(payload.area_value) || isNaN(payload.price)) {
     alert("Please fill in all fields before adding.");
