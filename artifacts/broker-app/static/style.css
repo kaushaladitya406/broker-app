@@ -495,6 +495,29 @@ textarea#whatsappMsg::placeholder { color: #9ca3af; }
 .area-cell { font-size: 13px; }
 .sqft-sub { font-size: 11px; color: var(--text-muted); }
 
+/* ─── Share button ───────────────────────────────────────────────────────── */
+.btn-share {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1.5px solid #bbf7d0;
+  font-size: 15px;
+  border-radius: 7px;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, transform 0.1s;
+}
+.btn-share:hover { background: #bbf7d0; transform: scale(1.1); }
+.btn-share-copied {
+  background: #16a34a !important;
+  color: #fff !important;
+  border-color: #16a34a !important;
+  transform: scale(1.15);
+}
+
 /* ─── Area input row ─────────────────────────────────────────────────────── */
 .area-input-row {
   display: flex;

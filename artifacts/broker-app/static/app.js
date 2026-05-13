@@ -108,6 +108,53 @@ function configTag(config) {
   return `<span class="config-tag">${config || "—"}</span>`;
 }
 
+function buildShareText(p) {
+  const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
+  const statusEmoji = { Available: "✅", Reserved: "🔒", Sold: "❌", Rented: "🔑" };
+  const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
+    ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit} (${Number(p.size).toLocaleString("en-IN")} Sq Ft)`
+    : `${Number(p.size || p.area_value).toLocaleString("en-IN")} Sq Ft`;
+  const priceFormatted = (() => {
+    const n = Number(p.price);
+    if (n >= 10000000) return `Rs ${(n / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
+    if (n >= 100000) return `Rs ${(n / 100000).toFixed(2).replace(/\.?0+$/, "")} Lakh`;
+    return `Rs ${n.toLocaleString("en-IN")}`;
+  })();
+  const emoji = typeEmoji[p.property_type] || "🏘️";
+  return [
+    `${emoji} *${p.configuration} ${p.property_type}*`,
+    `📍 ${p.location}`,
+    `📐 ${areaLine}`,
+    `💰 ${priceFormatted}`,
+    `${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
+    ``,
+    `_Contact us for details_ 📞`,
+  ].join("\n");
+}
+
+async function shareProperty(id, btn) {
+  const p = allProperties.find(x => x.id === id);
+  if (!p) return;
+  const text = buildShareText(p);
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.textContent = "✅";
+    btn.title = "Copied!";
+    btn.classList.add("btn-share-copied");
+    setTimeout(() => { btn.textContent = "📤"; btn.title = "Copy WhatsApp message"; btn.classList.remove("btn-share-copied"); }, 1800);
+  } catch {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+    btn.textContent = "✅";
+    setTimeout(() => { btn.textContent = "📤"; }, 1800);
+  }
+}
+
 function renderTable(props) {
   const tbody = document.getElementById("propertiesBody");
   if (!Array.isArray(props) || props.length === 0) {
@@ -123,6 +170,7 @@ function renderTable(props) {
       <td>${formatPrice(p.price)}</td>
       <td>${statusBadge(p.status)}</td>
       <td class="actions-cell">
+        <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">📤</button>
         <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">🗑️</button>
       </td>
