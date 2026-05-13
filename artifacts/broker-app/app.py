@@ -98,6 +98,7 @@ def init_db():
             "ALTER TABLE properties ADD COLUMN configuration TEXT DEFAULT 'Other'",
             "ALTER TABLE properties ADD COLUMN area_value REAL DEFAULT 0",
             "ALTER TABLE properties ADD COLUMN area_unit TEXT DEFAULT 'Sq Ft'",
+            "ALTER TABLE properties ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
         ]:
             try:
                 db.execute(stmt)
@@ -108,6 +109,21 @@ def init_db():
     elif not existing_cols:
         # Fresh install — seed
         _seed_properties(db)
+
+    # Notes migration for DBs that have configuration but not notes yet
+    current_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()]
+    if 'notes' not in current_cols:
+        try:
+            db.execute("ALTER TABLE properties ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+        except Exception:
+            pass
+
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL DEFAULT ''
+        )
+    """)
 
     db.execute("""
         CREATE TABLE IF NOT EXISTS inquiries (
@@ -251,11 +267,11 @@ def add_property():
     sqft = to_sqft(data["area_value"], data["area_unit"])
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status, notes) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (data["property_type"], data["location"], data["configuration"],
          float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"])
+         float(data["price"]), data["status"], data.get("notes", ""))
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -280,10 +296,10 @@ def update_property(prop_id):
     sqft = to_sqft(data["area_value"], data["area_unit"])
     db = get_db()
     db.execute(
-        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=? WHERE id=?",
+        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=?, notes=? WHERE id=?",
         (data["property_type"], data["location"], data["configuration"],
          float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"], prop_id)
+         float(data["price"]), data["status"], data.get("notes", ""), prop_id)
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
@@ -563,6 +579,7 @@ def match_properties():
     inventory_text = "\n".join([
         f"ID {p['id']}: {p['configuration']} {p['property_type']} in {p['location']}, "
         f"{area_display(p)}, Rs {p['price']:,.0f}, Status: {p['status']}"
+        + (f", Features: {p['notes']}" if p.get('notes') else "")
         for p in inventory
     ])
 
@@ -611,6 +628,32 @@ Return ONLY valid JSON, no markdown, no extra text."""
         "matched_ids": matched_ids,
         "summary": result.get("summary", ""),
     })
+
+
+# ─── Settings ────────────────────────────────────────────────────────────────
+
+@app.route("/api/settings", methods=["GET"])
+@login_required
+def get_settings():
+    db = get_db()
+    rows = db.execute("SELECT key, value FROM settings").fetchall()
+    return jsonify({r["key"]: r["value"] for r in rows})
+
+
+@app.route("/api/settings", methods=["PUT"])
+@login_required
+def update_settings():
+    data = request.get_json()
+    db = get_db()
+    for key in ["broker_name", "broker_phone", "broker_tagline"]:
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, data.get(key, ""))
+        )
+    db.commit()
+    rows = db.execute("SELECT key, value FROM settings").fetchall()
+    return jsonify({r["key"]: r["value"] for r in rows})
 
 
 if __name__ == "__main__":

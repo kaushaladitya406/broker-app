@@ -30,6 +30,7 @@
     <button class="tab-btn" id="tab-buyers" onclick="showTab('buyers')">👤 Buyers</button>
     <button class="tab-btn" id="tab-inquiries" onclick="showTab('inquiries')">📁 Inquiries</button>
     <button class="tab-btn" id="tab-followups" onclick="showTab('followups')">🔔 Follow-ups <span class="overdue-badge" id="overdueBadge" style="display:none"></span></button>
+    <button class="tab-btn tab-btn-settings" id="tab-settings" onclick="showTab('settings')">⚙️ Settings</button>
   </div>
 
   <!-- ─── INVENTORY TAB ─────────────────────────────── -->
@@ -187,6 +188,35 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
     </div>
   </div>
 
+  <!-- ─── SETTINGS TAB ─────────────────────────────── -->
+  <div class="tab-panel" id="panel-settings">
+    <div class="section settings-section">
+      <div class="settings-top">
+        <div class="section-title">⚙️ Broker Profile</div>
+        <p class="settings-hint">Your name and phone will appear in every WhatsApp share message instead of "Contact us for details".</p>
+      </div>
+      <form id="settingsForm" onsubmit="saveSettings(event)" class="settings-form">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" id="settingName" placeholder="e.g. Rajesh Singh" />
+        </div>
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input type="tel" id="settingPhone" placeholder="e.g. +91 98765 43210" />
+        </div>
+        <div class="form-group">
+          <label>Tagline <span class="label-hint">(optional)</span></label>
+          <input type="text" id="settingTagline" placeholder="e.g. Trusted broker in Chandigarh since 2010" />
+        </div>
+        <div class="settings-preview" id="settingsPreview" style="display:none"></div>
+        <div class="settings-actions">
+          <button type="submit" class="btn-primary" id="saveSettingsBtn">Save Profile</button>
+          <span class="settings-saved" id="settingsSaved" style="display:none">✅ Profile saved!</span>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </main>
 
 <!-- ─── BUYER MATCH ALERT MODAL ──────────── -->
@@ -260,6 +290,10 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <div class="form-group">
           <label>Price (Rs)</label>
           <input type="number" id="propPrice" placeholder="e.g. 5000000" min="0" required />
+        </div>
+        <div class="form-group">
+          <label>Notes / Features <span class="label-hint">(optional)</span></label>
+          <textarea id="propNotes" rows="3" placeholder="e.g. East facing, lift, covered parking, gated society, newly renovated, corner plot..."></textarea>
         </div>
       </div>
       <div class="modal-footer">

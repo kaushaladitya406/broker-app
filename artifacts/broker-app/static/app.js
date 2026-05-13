@@ -10,6 +10,7 @@ let editingBuyerId = null;
 let editingFollowupId = null;
 let lastMatchedIds = [];
 let lastMatchMessage = "";
+let brokerProfile = { broker_name: "", broker_phone: "", broker_tagline: "" };
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -69,6 +70,67 @@ function showTab(tab) {
   if (tab === "inquiries") fetchInquiries();
   if (tab === "buyers") fetchBuyers();
   if (tab === "followups") fetchFollowups();
+  if (tab === "settings") fetchSettings();
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
+async function fetchSettings() {
+  const res = await apiFetch(`${API}/api/settings`);
+  if (!res) return;
+  const data = await res.json();
+  brokerProfile = { broker_name: "", broker_phone: "", broker_tagline: "", ...data };
+  const nameEl = document.getElementById("settingName");
+  const phoneEl = document.getElementById("settingPhone");
+  const taglineEl = document.getElementById("settingTagline");
+  if (nameEl) nameEl.value = brokerProfile.broker_name || "";
+  if (phoneEl) phoneEl.value = brokerProfile.broker_phone || "";
+  if (taglineEl) taglineEl.value = brokerProfile.broker_tagline || "";
+  updateSettingsPreview();
+}
+
+function updateSettingsPreview() {
+  const name = document.getElementById("settingName")?.value?.trim() || "";
+  const phone = document.getElementById("settingPhone")?.value?.trim() || "";
+  const tagline = document.getElementById("settingTagline")?.value?.trim() || "";
+  const preview = document.getElementById("settingsPreview");
+  if (!preview) return;
+  if (name || phone) {
+    const contact = name && phone ? `${name}: ${phone}` : name || phone;
+    preview.style.display = "block";
+    preview.innerHTML = `
+      <div class="settings-preview-label">Preview in WhatsApp share:</div>
+      <div class="settings-preview-text">📞 Contact ${contact}${tagline ? `\n_${tagline}_` : ""}</div>
+    `;
+  } else {
+    preview.style.display = "none";
+  }
+}
+
+async function saveSettings(e) {
+  e.preventDefault();
+  const payload = {
+    broker_name: document.getElementById("settingName").value.trim(),
+    broker_phone: document.getElementById("settingPhone").value.trim(),
+    broker_tagline: document.getElementById("settingTagline").value.trim(),
+  };
+  const btn = document.getElementById("saveSettingsBtn");
+  btn.disabled = true; btn.textContent = "Saving...";
+  try {
+    const res = await apiFetch(`${API}/api/settings`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res) return;
+    brokerProfile = payload;
+    updateSettingsPreview();
+    const saved = document.getElementById("settingsSaved");
+    saved.style.display = "inline";
+    setTimeout(() => { saved.style.display = "none"; }, 2500);
+  } finally {
+    btn.disabled = false; btn.textContent = "Save Profile";
+  }
 }
 
 // ─── Inventory ────────────────────────────────────────────────────────────────
@@ -108,28 +170,49 @@ function configTag(config) {
   return `<span class="config-tag">${config || "—"}</span>`;
 }
 
+// ─── Share ────────────────────────────────────────────────────────────────────
+
 function buildShareText(p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
   const statusEmoji = { Available: "✅", Reserved: "🔒", Sold: "❌", Rented: "🔑" };
   const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
     ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit} (${Number(p.size).toLocaleString("en-IN")} Sq Ft)`
     : `${Number(p.size || p.area_value).toLocaleString("en-IN")} Sq Ft`;
-  const priceFormatted = (() => {
-    const n = Number(p.price);
-    if (n >= 10000000) return `Rs ${(n / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`;
-    if (n >= 100000) return `Rs ${(n / 100000).toFixed(2).replace(/\.?0+$/, "")} Lakh`;
-    return `Rs ${n.toLocaleString("en-IN")}`;
-  })();
+  const n = Number(p.price);
+  const priceFormatted = n >= 10000000
+    ? `Rs ${(n / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`
+    : n >= 100000
+    ? `Rs ${(n / 100000).toFixed(2).replace(/\.?0+$/, "")} Lakh`
+    : `Rs ${n.toLocaleString("en-IN")}`;
   const emoji = typeEmoji[p.property_type] || "🏘️";
-  return [
+
+  const lines = [
     `${emoji} *${p.configuration} ${p.property_type}*`,
     `📍 ${p.location}`,
     `📐 ${areaLine}`,
     `💰 ${priceFormatted}`,
     `${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
-    ``,
-    `_Contact us for details_ 📞`,
-  ].join("\n");
+  ];
+
+  if (p.notes && p.notes.trim()) {
+    lines.push(``, `📝 ${p.notes.trim()}`);
+  }
+
+  lines.push(``);
+
+  const name = brokerProfile.broker_name?.trim() || "";
+  const phone = brokerProfile.broker_phone?.trim() || "";
+  const tagline = brokerProfile.broker_tagline?.trim() || "";
+
+  if (name || phone) {
+    const contact = name && phone ? `${name}: ${phone}` : name || phone;
+    lines.push(`📞 Contact ${contact}`);
+    if (tagline) lines.push(`_${tagline}_`);
+  } else {
+    lines.push(`_Contact us for details_ 📞`);
+  }
+
+  return lines.join("\n");
 }
 
 async function shareProperty(id, btn) {
@@ -155,16 +238,35 @@ async function shareProperty(id, btn) {
   }
 }
 
+// ─── Expandable notes ─────────────────────────────────────────────────────────
+
+function toggleNotes(id) {
+  const row = document.getElementById(`notes-row-${id}`);
+  const btn = document.getElementById(`notes-toggle-${id}`);
+  if (!row) return;
+  const isHidden = row.style.display === "none" || !row.style.display;
+  row.style.display = isHidden ? "table-row" : "none";
+  if (btn) {
+    btn.textContent = isHidden ? "▲" : "💬";
+    btn.classList.toggle("notes-toggle-active", isHidden);
+  }
+}
+
 function renderTable(props) {
   const tbody = document.getElementById("propertiesBody");
   if (!Array.isArray(props) || props.length === 0) {
     tbody.innerHTML = `<tr><td colspan="7" class="empty-row">No properties found. Add your first one above.</td></tr>`;
     return;
   }
-  tbody.innerHTML = props.map(p => `
+  tbody.innerHTML = props.map(p => {
+    const hasNotes = p.notes && p.notes.trim();
+    return `
     <tr class="prop-row">
       <td><span class="type-tag">${p.property_type}</span></td>
-      <td>${p.location}</td>
+      <td>
+        <span class="location-text">${p.location}</span>
+        ${hasNotes ? `<button class="notes-toggle-btn" id="notes-toggle-${p.id}" onclick="toggleNotes(${p.id})" title="View notes & features">💬</button>` : ""}
+      </td>
       <td>${configTag(p.configuration)}</td>
       <td class="area-cell">${formatArea(p)}</td>
       <td>${formatPrice(p.price)}</td>
@@ -175,7 +277,16 @@ function renderTable(props) {
         <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">🗑️</button>
       </td>
     </tr>
-  `).join("");
+    ${hasNotes ? `
+    <tr class="notes-expand-row" id="notes-row-${p.id}" style="display:none">
+      <td colspan="7">
+        <div class="notes-expand-content">
+          <span class="notes-expand-label">📝 Features & Notes</span>
+          <span class="notes-expand-text">${p.notes}</span>
+        </div>
+      </td>
+    </tr>` : ""}
+  `;}).join("");
 }
 
 function openAddModal() {
@@ -183,6 +294,7 @@ function openAddModal() {
   document.getElementById("modalTitle").textContent = "Add Property";
   document.getElementById("propForm").reset();
   document.getElementById("propAreaConversion").textContent = "";
+  document.getElementById("propNotes").value = "";
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -198,6 +310,7 @@ function openEditModal(id) {
   document.getElementById("propAreaUnit").value = p.area_unit || "Sq Ft";
   document.getElementById("propPrice").value = p.price;
   document.getElementById("propStatus").value = p.status;
+  document.getElementById("propNotes").value = p.notes || "";
   updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion");
   document.getElementById("propModal").classList.add("open");
 }
@@ -217,6 +330,7 @@ async function saveProperty(e) {
     area_unit: document.getElementById("propAreaUnit").value,
     price: parseFloat(document.getElementById("propPrice").value),
     status: document.getElementById("propStatus").value,
+    notes: document.getElementById("propNotes").value.trim(),
   };
   const btn = document.getElementById("saveBtn");
   btn.disabled = true;
@@ -317,6 +431,7 @@ async function matchProperties() {
             <span>📐 ${p.area_value ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit}` : `${Number(p.size).toLocaleString("en-IN")} Sq Ft`}</span>
             <span>💰 ${formatPrice(p.price)}</span>
           </div>
+          ${p.notes ? `<div class="match-card-notes">📝 ${p.notes}</div>` : ""}
         </div>
       `).join("") + `</div>`;
       html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">💾 Save as Inquiry</button>`;
@@ -785,6 +900,7 @@ async function saveParsedProperty() {
     area_unit: document.getElementById("confirmAreaUnit").value,
     price: parseFloat(document.getElementById("confirmPrice").value),
     status: document.getElementById("confirmStatus").value,
+    notes: "",
   };
   if (!payload.location || isNaN(payload.area_value) || isNaN(payload.price)) {
     alert("Please fill in all fields before adding.");
@@ -823,11 +939,16 @@ document.getElementById("editInquiryForm").addEventListener("submit", updateInqu
 document.getElementById("inqStatusFilter").addEventListener("change", fetchInquiries);
 document.getElementById("buyerForm").addEventListener("submit", saveBuyer);
 document.getElementById("followupForm").addEventListener("submit", saveFollowup);
+document.getElementById("settingsForm").addEventListener("submit", saveSettings);
 
 document.getElementById("propAreaValue").addEventListener("input", () =>
   updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion"));
 document.getElementById("propAreaUnit").addEventListener("change", () =>
   updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion"));
+
+document.getElementById("settingName").addEventListener("input", updateSettingsPreview);
+document.getElementById("settingPhone").addEventListener("input", updateSettingsPreview);
+document.getElementById("settingTagline").addEventListener("input", updateSettingsPreview);
 
 ["propModal","saveInquiryModal","editInquiryModal","addBuyerModal","addFollowupModal","buyerMatchModal"].forEach(id => {
   document.getElementById(id).addEventListener("click", function(e) { if (e.target === this) this.classList.remove("open"); });
@@ -835,6 +956,7 @@ document.getElementById("propAreaUnit").addEventListener("change", () =>
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+fetchSettings();
 fetchProperties();
 apiFetch(`${API}/api/followups`).then(r => r && r.json()).then(data => {
   if (Array.isArray(data)) { allFollowups = data; updateOverdueBadge(data); }
