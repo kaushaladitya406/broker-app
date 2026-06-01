@@ -62,10 +62,16 @@ function formatPrice(n) {
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
 function showTab(tab) {
-  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".sidebar-item").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".bottom-tab").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
-  document.getElementById(`tab-${tab}`).classList.add("active");
-  document.getElementById(`panel-${tab}`).classList.add("active");
+  const navEl = document.getElementById(`nav-${tab}`);
+  const btabEl = document.getElementById(`btab-${tab}`);
+  if (navEl) navEl.classList.add("active");
+  if (btabEl) btabEl.classList.add("active");
+  const panel = document.getElementById(`panel-${tab}`);
+  if (panel) panel.classList.add("active");
+  if (tab === "dashboard") renderDashboard();
   if (tab === "inventory") fetchProperties();
   if (tab === "inquiries") fetchInquiries();
   if (tab === "buyers") fetchBuyers();
@@ -695,14 +701,51 @@ async function fetchFollowups() {
 
 function updateOverdueBadge(followups) {
   if (!Array.isArray(followups)) return;
-  const overdue = followups.filter(f => f.status === "Pending" && f.reminder_date < TODAY).length;
-  const badge = document.getElementById("overdueBadge");
-  if (overdue > 0) {
-    badge.textContent = overdue;
-    badge.style.display = "inline-flex";
-  } else {
-    badge.style.display = "none";
+  const count = followups.filter(f => f.status === "Pending" && f.reminder_date < TODAY).length;
+  [
+    document.getElementById("overdueBadge"),
+    document.getElementById("sidebarOverdueBadge"),
+    document.getElementById("btabOverdueBadge"),
+  ].forEach(el => {
+    if (!el) return;
+    el.textContent = count;
+    el.style.display = count > 0 ? "inline-flex" : "none";
+  });
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+function renderDashboard() {
+  const buyersEl = document.getElementById("dashBuyersCount");
+  const followupsEl = document.getElementById("dashFollowupsCount");
+  const inqEl = document.getElementById("dashInqCount");
+  if (buyersEl) buyersEl.textContent = allBuyers.length;
+  if (followupsEl) {
+    const pending = allFollowups.filter(f => f.status === "Pending" && f.reminder_date <= TODAY).length;
+    followupsEl.textContent = pending;
   }
+  if (inqEl) {
+    const newInq = allInquiries.filter(i => i.status === "New").length;
+    inqEl.textContent = newInq;
+  }
+  const recentEl = document.getElementById("dashRecentProps");
+  if (!recentEl) return;
+  const recent = allProperties.slice(0, 6);
+  if (recent.length === 0) {
+    recentEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🏘️</div><div class="empty-state-title">No properties yet</div><div class="empty-state-msg">Add your first property to get started.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div>`;
+    return;
+  }
+  recentEl.innerHTML = `<div class="recent-grid">${recent.map(p => `
+    <div class="recent-card">
+      <div class="recent-card-top">
+        <span class="type-tag">${p.property_type}</span>
+        ${statusBadge(p.status)}
+      </div>
+      <div class="recent-card-location">📍 ${p.location}</div>
+      <div class="recent-card-details">
+        ${configTag(p.configuration)} &bull; ${formatArea(p)} &bull; <strong>${formatPrice(p.price)}</strong>
+      </div>
+    </div>`).join("")}</div>`;
 }
 
 function renderFollowups(followups) {
@@ -1012,8 +1055,15 @@ document.getElementById("settingTagline").addEventListener("input", updateSettin
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
-fetchSettings();
-fetchProperties();
-apiFetch(`${API}/api/followups`).then(r => r && r.json()).then(data => {
-  if (Array.isArray(data)) { allFollowups = data; updateOverdueBadge(data); }
-});
+async function initApp() {
+  await fetchProperties();
+  await Promise.all([
+    fetchBuyers(),
+    fetchInquiries(),
+    fetchFollowups(),
+    fetchSettings(),
+  ]);
+  renderDashboard();
+}
+
+initApp();

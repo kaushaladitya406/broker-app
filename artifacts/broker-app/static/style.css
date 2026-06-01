@@ -1133,3 +1133,284 @@ textarea#whatsappMsg::placeholder { color: var(--text-muted); }
   .modal-header { padding: 14px 16px 12px; }
   .chat-body { max-height: 300px; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   SIDEBAR LAYOUT — overrides the old header/tabs styles
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* Kill old header (replaced by sidebar + mobile-header) */
+header { display: none; }
+
+/* App shell */
+.app-layout { display: flex; min-height: 100vh; }
+
+/* ─── Sidebar ──────────────────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  background: #0f172a;
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 300;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+.sidebar-logo-icon {
+  width: 34px; height: 34px;
+  background: var(--primary);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.sidebar-logo-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.3px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  color: rgba(255,255,255,0.55);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  font-family: inherit;
+  text-decoration: none;
+  min-height: 42px;
+}
+.sidebar-item:hover { background: rgba(255,255,255,0.07); color: rgba(255,255,255,0.85); }
+.sidebar-item.active { background: var(--primary); color: white; }
+.sidebar-icon { font-size: 17px; flex-shrink: 0; }
+.sidebar-label { flex: 1; }
+.sidebar-badge {
+  background: var(--danger);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 8px 8px 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sidebar-logout { color: rgba(255,255,255,0.4); }
+.sidebar-logout:hover { color: rgba(255,255,255,0.7); background: rgba(255,255,255,0.06); }
+
+/* ─── Main wrapper ────────────────────────────────────────────────── */
+.main-wrapper {
+  flex: 1;
+  margin-left: 240px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* Override existing main padding */
+main {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  width: 100%;
+}
+
+/* ─── Mobile header (hidden on desktop) ──────────────────────────── */
+.mobile-header {
+  display: none;
+  background: #0f172a;
+  height: 54px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.mobile-header-left { display: flex; align-items: center; gap: 8px; }
+.mobile-header-icon {
+  width: 30px; height: 30px;
+  background: var(--primary);
+  border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.mobile-header-brand { font-size: 16px; font-weight: 700; color: white; }
+.mobile-header-right { display: flex; align-items: center; gap: 8px; }
+
+/* ─── Bottom tab bar (hidden on desktop) ─────────────────────────── */
+.bottom-tab-bar {
+  display: none;
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: 60px;
+  background: #0f172a;
+  z-index: 400;
+  align-items: center;
+  justify-content: space-around;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.bottom-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  flex: 1;
+  position: relative;
+  font-family: inherit;
+  min-height: 44px;
+  padding: 0;
+}
+.btab-icon { font-size: 22px; line-height: 1; opacity: 0.45; transition: opacity 0.15s, transform 0.15s; }
+.bottom-tab.active .btab-icon { opacity: 1; transform: scale(1.08); }
+.bottom-tab:hover .btab-icon { opacity: 0.7; }
+.btab-badge {
+  position: absolute;
+  top: 8px; right: calc(50% - 18px);
+  background: var(--danger);
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  min-width: 15px; height: 15px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+}
+
+/* ─── Dashboard ─────────────────────────────────────────────────── */
+.dash-welcome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.dash-title { font-size: 22px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+.dash-subtitle { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
+
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.summary-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.15s;
+  border-left: 4px solid var(--border);
+}
+.summary-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+.summary-card-blue { border-left-color: var(--primary); }
+.summary-card-orange { border-left-color: var(--warning); }
+.summary-card-indigo { border-left-color: var(--purple); }
+.summary-card-value { font-size: 28px; font-weight: 800; color: var(--text); letter-spacing: -1px; }
+.summary-card-label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 4px; }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-link:hover { background: var(--primary-50); }
+
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 0 20px 20px;
+}
+.recent-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  transition: box-shadow 0.15s;
+}
+.recent-card:hover { box-shadow: var(--shadow); }
+.recent-card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.recent-card-location { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.recent-card-details { font-size: 12.5px; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ─── Responsive: hide sidebar, show mobile UI ──────────────────── */
+@media (max-width: 768px) {
+  .sidebar { display: none; }
+  .main-wrapper { margin-left: 0; }
+  .mobile-header { display: flex; }
+  .bottom-tab-bar { display: flex; }
+  main { padding: 14px 12px 80px; }
+  .summary-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .summary-card { padding: 12px 14px; }
+  .summary-card-value { font-size: 22px; }
+  .recent-grid { padding: 0 12px 14px; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .dash-welcome { margin-bottom: 14px; }
+  .dash-title { font-size: 18px; }
+}
+
+@media (max-width: 480px) {
+  .summary-row { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .summary-card { padding: 10px 10px; }
+  .summary-card-value { font-size: 20px; }
+  .summary-card-label { font-size: 10px; }
+  .recent-grid { grid-template-columns: 1fr; }
+}
