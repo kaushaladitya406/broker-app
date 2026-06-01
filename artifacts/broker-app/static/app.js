@@ -64,6 +64,37 @@ function formatPrice(n) {
   return "Rs " + Number(n).toLocaleString("en-IN");
 }
 
+// Parse broker price input: plain numbers, "80L"/"80 lakh", "1.5Cr"/"1.5 crore", commas
+function parsePriceInput(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).trim().toLowerCase();
+  if (!s) return NaN;
+  s = s.replace(/rs\.?|inr|₹/g, "").replace(/,/g, "").trim();
+  const crMatch = s.match(/^([\d.]+)\s*(cr|crore|crores)$/);
+  if (crMatch) return Math.round(parseFloat(crMatch[1]) * 10000000);
+  const lMatch = s.match(/^([\d.]+)\s*(l|lac|lacs|lakh|lakhs)$/);
+  if (lMatch) return Math.round(parseFloat(lMatch[1]) * 100000);
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.round(parseFloat(s));
+  return NaN;
+}
+
+// Format a number into Indian words: "Rs 80 Lakh", "Rs 1.5 Cr", or "Rs 50,000"
+function formatPriceWords(n) {
+  n = Number(n);
+  if (!n || isNaN(n) || n <= 0) return "";
+  if (n >= 10000000) return "Rs " + (n / 10000000).toFixed(2).replace(/\.?0+$/, "") + " Cr";
+  if (n >= 100000) return "Rs " + (n / 100000).toFixed(2).replace(/\.?0+$/, "") + " Lakh";
+  return "Rs " + n.toLocaleString("en-IN");
+}
+
+// Live helper text below a price/budget input
+function updatePriceConversion(inputId, displayId) {
+  const display = document.getElementById(displayId);
+  if (!display) return;
+  const n = parsePriceInput(document.getElementById(inputId)?.value);
+  display.textContent = (!isNaN(n) && n > 0) ? "≈ " + formatPriceWords(n) : "";
+}
+
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
 function showTab(tab) {
@@ -382,6 +413,7 @@ function openAddModal() {
   document.getElementById("modalTitle").textContent = "Add Property";
   document.getElementById("propForm").reset();
   document.getElementById("propAreaConversion").textContent = "";
+  document.getElementById("propPriceConv").textContent = "";
   document.getElementById("propNotes").value = "";
   document.getElementById("propModal").classList.add("open");
 }
@@ -400,6 +432,7 @@ function openEditModal(id) {
   document.getElementById("propStatus").value = p.status;
   document.getElementById("propNotes").value = p.notes || "";
   updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion");
+  updatePriceConversion("propPrice", "propPriceConv");
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -416,10 +449,15 @@ async function saveProperty(e) {
     configuration: document.getElementById("propConfig").value,
     area_value: parseFloat(document.getElementById("propAreaValue").value),
     area_unit: document.getElementById("propAreaUnit").value,
-    price: parseFloat(document.getElementById("propPrice").value),
+    price: parsePriceInput(document.getElementById("propPrice").value),
     status: document.getElementById("propStatus").value,
     notes: document.getElementById("propNotes").value.trim(),
   };
+  if (isNaN(payload.price) || payload.price <= 0) {
+    alert("Please enter a valid price (e.g. 5000000, 50L, or 1.5Cr).");
+    document.getElementById("propPrice").focus();
+    return;
+  }
   const btn = document.getElementById("saveBtn");
   btn.disabled = true;
   btn.textContent = "Saving...";
@@ -557,6 +595,14 @@ function closeBuyerMatchModal() {
 
 // ─── AI Matcher ───────────────────────────────────────────────────────────────
 
+function toggleMatchSummary() {
+  const st = document.getElementById("matchSummaryText");
+  const tg = document.getElementById("matchSummaryToggle");
+  if (!st || !tg) return;
+  const clamped = st.classList.toggle("clamped");
+  tg.textContent = clamped ? "Read more" : "Read less";
+}
+
 async function matchProperties() {
   const message = document.getElementById("whatsappMsg").value.trim();
   if (!message) return;
@@ -577,7 +623,10 @@ async function matchProperties() {
     const matches = data.matches || [];
     lastMatchedIds = data.matched_ids || [];
     lastMatchMessage = message;
-    let html = `<div class="match-summary"><p>${data.summary || ""}</p></div>`;
+    let html = `<div class="match-summary">
+      <p class="match-summary-text clamped" id="matchSummaryText">${data.summary || ""}</p>
+      <button type="button" class="match-summary-toggle" id="matchSummaryToggle" onclick="toggleMatchSummary()" style="display:none;">Read more</button>
+    </div>`;
     if (matches.length === 0) {
       html += `<p class="match-none">No matching properties found in inventory.</p>`;
     } else {
@@ -600,6 +649,9 @@ async function matchProperties() {
       html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">Save as Inquiry</button>`;
     }
     resultDiv.innerHTML = html;
+    const st = document.getElementById("matchSummaryText");
+    const tg = document.getElementById("matchSummaryToggle");
+    if (st && tg && st.scrollHeight > st.clientHeight + 1) tg.style.display = "inline-block";
   } catch (err) {
     resultDiv.innerHTML = `<p class="match-error">Error connecting to AI. Please try again.</p>`;
   } finally {
@@ -710,18 +762,21 @@ function renderClients() {
     return `
       <div class="client-card">
         <div class="client-card-head">
-          <div class="client-card-info">
-            <span class="client-card-name">${c.name}</span>
-            ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone">${c.phone}</a>` : ""}
+          <div class="client-card-top">
+            <div class="client-card-info">
+              <span class="client-card-name">${c.name}</span>
+              ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone">${c.phone}</a>` : ""}
+            </div>
+            <div class="client-card-actions">
+              <button class="btn-icon btn-edit" onclick="openEditClientModal(${c.id})">Edit</button>
+              <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Delete</button>
+            </div>
           </div>
+          ${clientStatusBadge(c.status) || matchBadge ? `
           <div class="client-card-meta">
             ${clientStatusBadge(c.status)}
             ${matchBadge}
-          </div>
-          <div class="client-card-actions">
-            <button class="btn-icon btn-edit" onclick="openEditClientModal(${c.id})">Edit</button>
-            <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Delete</button>
-          </div>
+          </div>` : ""}
         </div>
         ${lookingForFull || budgetText || c.notes ? `
         <div class="client-card-body">
@@ -764,6 +819,8 @@ function openAddClientModal() {
   document.getElementById("clientModalTitle").textContent = "Add Client";
   document.getElementById("clientForm").reset();
   document.getElementById("clientStatus").value = "Inquiry";
+  document.getElementById("clientBudgetMinConv").textContent = "";
+  document.getElementById("clientBudgetMaxConv").textContent = "";
   document.getElementById("addClientModal").classList.add("open");
 }
 
@@ -781,6 +838,8 @@ function openEditClientModal(id) {
   document.getElementById("clientBudgetMax").value = c.budget_max || "";
   document.getElementById("clientStatus").value = c.status;
   document.getElementById("clientNotes").value = c.notes || "";
+  updatePriceConversion("clientBudgetMin", "clientBudgetMinConv");
+  updatePriceConversion("clientBudgetMax", "clientBudgetMaxConv");
   document.getElementById("addClientModal").classList.add("open");
 }
 
@@ -794,11 +853,23 @@ async function saveClient(e) {
     property_type: document.getElementById("clientType").value,
     configuration: document.getElementById("clientConfig").value,
     location: document.getElementById("clientLocation").value.trim(),
-    budget_min: document.getElementById("clientBudgetMin").value || 0,
-    budget_max: document.getElementById("clientBudgetMax").value || 0,
+    budget_min: 0,
+    budget_max: 0,
     status: document.getElementById("clientStatus").value,
     notes: document.getElementById("clientNotes").value.trim(),
   };
+  const minRaw = document.getElementById("clientBudgetMin").value.trim();
+  const maxRaw = document.getElementById("clientBudgetMax").value.trim();
+  if (minRaw) {
+    const v = parsePriceInput(minRaw);
+    if (isNaN(v)) { alert("Budget Min isn't valid. Try e.g. 4000000, 40L, or 1.5Cr."); document.getElementById("clientBudgetMin").focus(); return; }
+    payload.budget_min = v;
+  }
+  if (maxRaw) {
+    const v = parsePriceInput(maxRaw);
+    if (isNaN(v)) { alert("Budget Max isn't valid. Try e.g. 8000000, 80L, or 1.5Cr."); document.getElementById("clientBudgetMax").focus(); return; }
+    payload.budget_max = v;
+  }
   const btn = document.getElementById("saveClientBtn");
   btn.disabled = true; btn.textContent = "Saving...";
   try {
@@ -1094,7 +1165,8 @@ function renderConfirmCard(p) {
         </div>
         <div class="confirm-field">
           <label>Price (Rs)</label>
-          <input type="number" id="confirmPrice" value="${p.price > 0 ? p.price : ""}" min="0" placeholder="e.g. 7000000" />
+          <input type="text" id="confirmPrice" value="${p.price > 0 ? p.price : ""}" inputmode="text" placeholder="e.g. 7000000 or 70L" oninput="updatePriceConversion('confirmPrice','confirmPriceConv')" />
+          <div class="area-conversion" id="confirmPriceConv">${p.price > 0 ? "≈ " + formatPriceWords(p.price) : ""}</div>
         </div>
         <div class="confirm-field">
           <label>Status</label>
@@ -1128,7 +1200,7 @@ async function saveParsedProperty() {
     configuration: document.getElementById("confirmConfig").value,
     area_value: parseFloat(document.getElementById("confirmAreaValue").value),
     area_unit: document.getElementById("confirmAreaUnit").value,
-    price: parseFloat(document.getElementById("confirmPrice").value),
+    price: parsePriceInput(document.getElementById("confirmPrice").value),
     status: document.getElementById("confirmStatus").value,
     notes: document.getElementById("confirmNotes")?.value?.trim() || "",
   };

@@ -353,7 +353,8 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         </div>
         <div class="form-group">
           <label>Price (Rs)</label>
-          <input type="number" id="propPrice" placeholder="e.g. 5000000" min="0" required />
+          <input type="text" id="propPrice" inputmode="text" placeholder="e.g. 5000000 or 50L or 1.5Cr" required oninput="updatePriceConversion('propPrice','propPriceConv')" />
+          <div class="area-conversion" id="propPriceConv"></div>
         </div>
         <div class="form-group">
           <label>Notes <span class="label-hint">(optional)</span></label>
@@ -461,11 +462,13 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <div class="form-row">
           <div class="form-group">
             <label>Budget Min (Rs)</label>
-            <input type="number" id="clientBudgetMin" placeholder="e.g. 4000000" min="0" />
+            <input type="text" id="clientBudgetMin" inputmode="text" placeholder="e.g. 40L" oninput="updatePriceConversion('clientBudgetMin','clientBudgetMinConv')" />
+            <div class="area-conversion" id="clientBudgetMinConv"></div>
           </div>
           <div class="form-group">
             <label>Budget Max (Rs)</label>
-            <input type="number" id="clientBudgetMax" placeholder="e.g. 8000000" min="0" />
+            <input type="text" id="clientBudgetMax" inputmode="text" placeholder="e.g. 80L" oninput="updatePriceConversion('clientBudgetMax','clientBudgetMaxConv')" />
+            <div class="area-conversion" id="clientBudgetMaxConv"></div>
           </div>
         </div>
         <div class="form-group">
