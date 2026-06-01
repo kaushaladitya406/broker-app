@@ -762,15 +762,14 @@ function renderClients() {
     return `
       <div class="client-card" id="client-card-${c.id}">
         <div class="client-card-summary" role="button" tabindex="0" aria-expanded="false" aria-controls="client-detail-${c.id}" onclick="toggleClientCard(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClientCard(${c.id});}">
-          <span class="client-card-name">${c.name}</span>
-          ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone" onclick="event.stopPropagation()">${c.phone}</a>` : ""}
-          <div class="client-card-badges">
-            ${clientStatusBadge(c.status)}
-            ${matchBadge}
+          <div class="client-card-ident">
+            <span class="client-card-name">${c.name}</span>
+            ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone" onclick="event.stopPropagation()">${c.phone}</a>` : ""}
           </div>
-          <span class="client-card-chevron" aria-hidden="true">▾</span>
+          ${clientStatusBadge(c.status)}
         </div>
         <div class="client-card-detail" id="client-detail-${c.id}">
+          ${matchBadge ? `<div class="client-card-matchrow">${matchBadge}</div>` : ""}
           ${lookingForFull || budgetText || c.notes ? `
           <div class="client-card-body">
             ${lookingForFull ? `<div class="client-detail-row"><span class="client-detail-label">Needs</span><span class="client-detail-value">${lookingForFull}</span></div>` : ""}
