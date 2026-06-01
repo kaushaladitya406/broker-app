@@ -167,6 +167,7 @@ async function fetchProperties() {
   if (!res) return;
   allProperties = await res.json();
   renderTable(allProperties);
+  renderMobileList(allProperties);
   updateStats();
 }
 
@@ -307,6 +308,50 @@ function renderTable(props) {
       </td>
     </tr>` : ""}
   `;}).join("");
+}
+
+function renderMobileList(props) {
+  const container = document.getElementById("propMobileList");
+  if (!container) return;
+  if (!Array.isArray(props) || props.length === 0) {
+    container.innerHTML = `<div class="prop-mobile-empty"><div class="empty-state-title">No properties found</div><div class="empty-state-msg">Add your first property using Quick Add AI above, or click + Add Property.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div>`;
+    return;
+  }
+  container.innerHTML = props.map(p => {
+    const parts = [p.configuration, formatArea(p), formatPrice(p.price)].filter(Boolean);
+    const line2 = parts.join(" · ");
+    const hasNotes = p.notes && p.notes.trim();
+    return `
+      <div class="prop-mobile-item" id="mobile-item-${p.id}">
+        <div class="prop-mobile-summary" onclick="toggleMobileRow(${p.id})">
+          <div class="prop-mobile-main">
+            <div class="prop-mobile-line1">${p.property_type} · ${p.location}</div>
+            <div class="prop-mobile-line2">${line2}</div>
+          </div>
+          <div class="prop-mobile-right">
+            ${statusBadge(p.status)}
+            <span class="prop-mobile-expand">▾</span>
+          </div>
+        </div>
+        <div class="prop-mobile-detail" id="mobile-detail-${p.id}" style="display:none">
+          ${hasNotes ? `<div class="prop-mobile-notes">📝 ${p.notes}</div>` : ""}
+          <div class="prop-mobile-actions">
+            <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)">↗ Share</button>
+            <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})">Edit</button>
+            <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})">Del</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function toggleMobileRow(id) {
+  const item = document.getElementById(`mobile-item-${id}`);
+  const detail = document.getElementById(`mobile-detail-${id}`);
+  if (!item || !detail) return;
+  const isExpanded = item.classList.contains("expanded");
+  item.classList.toggle("expanded", !isExpanded);
+  detail.style.display = isExpanded ? "none" : "block";
 }
 
 function openAddModal() {
