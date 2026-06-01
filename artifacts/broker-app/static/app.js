@@ -27,9 +27,7 @@ function toSqft(value, unit) {
 }
 
 function roundArea(n) {
-  const r = Math.round(Number(n) * 10) / 10;
-  if (r % 1 === 0) return Math.round(r).toLocaleString("en-IN");
-  return r.toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return Math.round(Number(n)).toLocaleString("en-IN");
 }
 
 function formatArea(p) {
@@ -48,7 +46,7 @@ function updateAreaConversion(valueId, unitId, displayId) {
   if (!display) return;
   if (!isNaN(val) && val > 0 && unit && unit !== "Sq Ft") {
     const sqft = toSqft(val, unit);
-    display.textContent = `≈ ${Number(sqft).toLocaleString("en-IN")} Sq Ft`;
+    display.textContent = `≈ ${Math.round(sqft).toLocaleString("en-IN")} Sq Ft`;
   } else {
     display.textContent = "";
   }
@@ -757,17 +755,18 @@ function renderDashboard() {
     recentEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">No properties yet</div><div class="empty-state-msg">Add your first property to get started.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div>`;
     return;
   }
-  recentEl.innerHTML = `<div class="recent-grid">${recent.map(p => `
-    <div class="recent-card">
-      <div class="recent-card-top">
-        <span class="type-tag">${p.property_type}</span>
-        ${statusBadge(p.status)}
+  recentEl.innerHTML = `<div class="dash-recent-list">${recent.map(p => {
+    const line2 = [p.configuration, formatArea(p), formatPrice(p.price)].filter(Boolean).join(" · ");
+    return `<div class="dash-recent-item">
+      <div class="dash-recent-row">
+        <div class="dash-recent-main">
+          <div class="dash-recent-line1">${p.property_type} · ${p.location}</div>
+          <div class="dash-recent-line2">${line2}</div>
+        </div>
+        <div class="dash-recent-right">${statusBadge(p.status)}</div>
       </div>
-      <div class="recent-card-location">${p.location}</div>
-      <div class="recent-card-details">
-        ${configTag(p.configuration)} &bull; ${formatArea(p)} &bull; <strong>${formatPrice(p.price)}</strong>
-      </div>
-    </div>`).join("")}</div>`;
+    </div>`;
+  }).join("")}</div>`;
 }
 
 function renderFollowups(followups) {
