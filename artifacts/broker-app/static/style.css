@@ -256,7 +256,11 @@ main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
   border-bottom: 1px solid var(--border); align-items: center; flex-wrap: nowrap;
 }
 .inventory-filters .search-input { flex: 2 1 0; min-width: 0; width: auto; }
-.inventory-filters .filter-select { flex: 1 1 0; min-width: 0; width: auto; }
+.inventory-filters .filter-select {
+  flex: 1 1 0; min-width: 0; width: auto;
+  font-size: 12.5px; padding: 7px 6px;
+  text-overflow: ellipsis;
+}
 .stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 
 /* ─── Form controls ─────────────────────────────────────────────────── */
@@ -515,9 +519,24 @@ td {
   color: var(--text-3);
 }
 .btn-icon:hover { background: var(--soft); color: var(--text); }
-.btn-edit:hover { color: var(--primary); }
-.btn-delete:hover { color: var(--danger); background: var(--danger-light); }
-.btn-status:hover { color: var(--warning); background: var(--orange-light); }
+.btn-icon.btn-edit:hover { color: var(--primary); }
+.btn-icon.btn-delete:hover { color: var(--danger); background: var(--danger-light); }
+/* Outlined pill action buttons (Status / Edit / Delete) */
+.btn-action-pill {
+  padding: 6px 12px;
+  font-size: 12px; font-weight: 500;
+  border-radius: var(--radius-sm);
+  cursor: pointer; font-family: inherit;
+  background: var(--bg);
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+.btn-action-pill.btn-status { border: 1px solid var(--primary); color: var(--primary); }
+.btn-action-pill.btn-status:hover { background: var(--primary-light); }
+.btn-action-pill.btn-edit { border: 1px solid var(--border); color: var(--text-2); }
+.btn-action-pill.btn-edit:hover { background: var(--soft); color: var(--text); border-color: var(--text-3); }
+.btn-action-pill.btn-delete { border: 1px solid #f0b4b4; color: var(--danger); }
+.btn-action-pill.btn-delete:hover { background: var(--danger-light); }
 .inq-meta { font-size: 12px; color: var(--text-3); }
 .inq-notes { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 
@@ -1021,17 +1040,18 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   color: var(--text-3);
 }
 .notes-toggle-btn:hover { background: var(--border); color: var(--text); }
-.notes-toggle-active { background: #fef6e4 !important; border-color: #f5d796 !important; color: var(--warning) !important; }
+.notes-toggle-active { background: #e3f0ff !important; border-color: #cfe4fb !important; color: var(--primary) !important; }
 .notes-expand-row td { padding: 0 !important; }
 .notes-expand-content {
   display: flex; gap: 8px; align-items: baseline;
   padding: 8px 14px 10px;
-  background: #fef9f0;
-  border-bottom: 1px solid #f5d796;
+  background: #f0f7ff;
+  border-bottom: 1px solid #cfe4fb;
   animation: fadeDown 0.12s ease-out;
 }
+.prop-row.row-expanded > td { background: #f0f7ff; }
 @keyframes fadeDown { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
-.notes-expand-label { font-size: 11px; font-weight: 600; color: var(--warning); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; flex-shrink: 0; }
+.notes-expand-label { font-size: 11px; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; flex-shrink: 0; }
 .notes-expand-text { font-size: 13px; color: var(--text-2); line-height: 1.5; }
 
 /* ─── Share button ──────────────────────────────────────────────────── */
@@ -1039,15 +1059,21 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   background: var(--success-light);
   color: var(--success);
   border: 1px solid #b7dfb7;
-  font-size: 13px;
   border-radius: var(--radius-sm);
-  width: 28px; height: 28px;
+  padding: 4px 10px;
   cursor: pointer;
-  display: inline-flex; align-items: center; justify-content: center;
-  transition: background 0.1s;
+  font-family: inherit;
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1px;
+  transition: all 0.12s;
 }
+.btn-share svg { display: block; }
+.btn-share .btn-action-label { font-size: 10px; font-weight: 600; line-height: 1; }
 .btn-share:hover { background: #d4edda; }
 .btn-share-copied { background: var(--success) !important; color: white !important; border-color: var(--success) !important; }
+/* Horizontal share variant for mobile action row */
+.btn-share-row { flex-direction: row; gap: 5px; padding: 6px 12px; }
+.btn-share-row .btn-action-label { font-size: 12px; }
 
 /* ─── Area input row ────────────────────────────────────────────────── */
 .area-input-row { display: flex; gap: 8px; }
@@ -1357,8 +1383,8 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   }
   .prop-mobile-item.expanded .prop-mobile-expand { transform: rotate(180deg); }
   .prop-mobile-detail {
-    background: var(--soft);
-    border-top: 1px solid var(--border);
+    background: #f0f7ff;
+    border-top: 1px solid #cfe4fb;
     padding: 10px 14px 12px;
   }
   .prop-mobile-notes {

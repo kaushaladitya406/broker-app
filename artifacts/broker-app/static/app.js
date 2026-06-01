@@ -1,5 +1,7 @@
 const API = "";
 
+const WHATSAPP_ICON = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M17.5 14.4c-.3-.1-1.7-.8-1.9-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.4-2.3-1.4-.9-.8-1.4-1.7-1.6-2-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5-.1-.1-.7-1.6-.9-2.2-.2-.6-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.5s1.1 2.9 1.2 3.1c.1.2 2.1 3.2 5.1 4.5.7.3 1.3.5 1.7.6.7.2 1.4.2 1.9.1.6-.1 1.7-.7 1.9-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3zM12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 4.9L2 22l5.2-1.4c1.4.8 3 1.2 4.8 1.2 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>`;
+
 let allProperties = [];
 let allClients = [];
 let allFollowups = [];
@@ -248,12 +250,20 @@ async function shareProperty(id, btn) {
   const p = allProperties.find(x => x.id === id);
   if (!p) return;
   const text = buildShareText(p);
+  const label = btn.querySelector(".btn-action-label");
+  const showCopied = () => {
+    btn.classList.add("btn-share-copied");
+    btn.title = "Copied!";
+    if (label) label.textContent = "Copied!";
+    setTimeout(() => {
+      btn.classList.remove("btn-share-copied");
+      btn.title = "Share on WhatsApp";
+      if (label) label.textContent = "Share";
+    }, 1800);
+  };
   try {
     await navigator.clipboard.writeText(text);
-    btn.textContent = "✓";
-    btn.title = "Copied!";
-    btn.classList.add("btn-share-copied");
-    setTimeout(() => { btn.textContent = "↗"; btn.title = "Copy WhatsApp message"; btn.classList.remove("btn-share-copied"); }, 1800);
+    showCopied();
   } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -262,8 +272,7 @@ async function shareProperty(id, btn) {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    btn.textContent = "✓";
-    setTimeout(() => { btn.textContent = "↗"; }, 1800);
+    showCopied();
   }
 }
 
@@ -275,6 +284,10 @@ function toggleNotes(id) {
   if (!row) return;
   const isHidden = row.style.display === "none" || !row.style.display;
   row.style.display = isHidden ? "table-row" : "none";
+  const propRow = row.previousElementSibling;
+  if (propRow && propRow.classList.contains("prop-row")) {
+    propRow.classList.toggle("row-expanded", isHidden);
+  }
   if (btn) {
     btn.textContent = isHidden ? "▲" : "▾";
     btn.classList.toggle("notes-toggle-active", isHidden);
@@ -301,10 +314,10 @@ function renderTable(props) {
       <td data-label="Price">${formatPrice(p.price)}</td>
       <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
-        <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">↗</button>
-        <button class="btn-icon btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
-        <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
-        <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
+        <button class="btn-share" onclick="shareProperty(${p.id}, this)" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
+        <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
+        <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
+        <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
       </td>
     </tr>
     ${hasNotes ? `
@@ -345,10 +358,10 @@ function renderMobileList(props) {
         <div class="prop-mobile-detail" id="mobile-detail-${p.id}" style="display:none">
           ${hasNotes ? `<div class="prop-mobile-notes">📝 ${p.notes}</div>` : ""}
           <div class="prop-mobile-actions">
-            <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)">↗ Share</button>
-            <button class="btn-icon btn-status" onclick="openQuickStatusModal(${p.id})">Status</button>
-            <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})">Edit</button>
-            <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})">Delete</button>
+            <button class="btn-share btn-share-row" onclick="shareProperty(${p.id}, this)">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
+            <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})">Status</button>
+            <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})">Edit</button>
+            <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})">Delete</button>
           </div>
         </div>
       </div>`;
