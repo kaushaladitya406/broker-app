@@ -69,6 +69,7 @@ def _seed_properties(db):
 
 def init_db():
     db = sqlite3.connect(DB_PATH)
+    db.row_factory = sqlite3.Row
 
     # Check current schema
     existing_tables = [r[0] for r in db.execute(
@@ -159,6 +160,46 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL DEFAULT '',
+            property_type TEXT DEFAULT '',
+            location TEXT DEFAULT '',
+            budget_min REAL DEFAULT 0,
+            budget_max REAL DEFAULT 0,
+            configuration TEXT DEFAULT '',
+            notes TEXT DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'Inquiry',
+            date_added TEXT NOT NULL DEFAULT (date('now')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # One-time migration: buyers → clients (Active), inquiries → clients (Inquiry)
+    migrated = db.execute("SELECT value FROM settings WHERE key='clients_v1'").fetchone()
+    if not migrated:
+        buyers_exist = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='buyers'").fetchone()
+        if buyers_exist:
+            for b in db.execute("SELECT * FROM buyers").fetchall():
+                db.execute(
+                    "INSERT INTO clients (name, phone, property_type, location, budget_min, budget_max, notes, status) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')",
+                    (b["name"], b["phone"] or "", b["property_type"] or "",
+                     b["location"] or "", float(b["budget_min"] or 0),
+                     float(b["budget_max"] or 0), b["notes"] or "")
+                )
+        inq_exist = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='inquiries'").fetchone()
+        if inq_exist:
+            for inq in db.execute("SELECT * FROM inquiries").fetchall():
+                db.execute(
+                    "INSERT INTO clients (name, notes, status) VALUES (?, ?, 'Inquiry')",
+                    (inq["client_name"], inq["notes"] or "")
+                )
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES ('clients_v1', '1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
     db.commit()
     db.close()
 
@@ -210,7 +251,7 @@ def index():
 # ─── Properties ─────────────────────────────────────────────────────────────
 
 def find_matching_buyers(db, prop):
-    buyers = [dict(r) for r in db.execute("SELECT * FROM buyers ORDER BY created_at DESC").fetchall()]
+    buyers = [dict(r) for r in db.execute("SELECT * FROM clients WHERE status='Active' ORDER BY created_at DESC").fetchall()]
     matches = []
     for b in buyers:
         if b["property_type"] and b["property_type"] != prop["property_type"]:
@@ -424,6 +465,70 @@ def update_buyer(buyer_id):
     db.commit()
     row = db.execute("SELECT * FROM buyers WHERE id = ?", (buyer_id,)).fetchone()
     return jsonify(dict(row))
+
+
+# ─── Clients ─────────────────────────────────────────────────────────────────
+
+@app.route("/api/clients", methods=["GET"])
+@login_required
+def get_clients():
+    db = get_db()
+    status_filter = request.args.get("status", "").strip()
+    sql = "SELECT * FROM clients WHERE 1=1"
+    params = []
+    if status_filter:
+        sql += " AND status = ?"
+        params.append(status_filter)
+    sql += " ORDER BY created_at DESC"
+    rows = db.execute(sql, params).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/clients", methods=["POST"])
+@login_required
+def add_client():
+    data = request.get_json()
+    if not data.get("name"):
+        return jsonify({"error": "Name is required"}), 400
+    db = get_db()
+    cursor = db.execute(
+        "INSERT INTO clients (name, phone, property_type, location, budget_min, budget_max, configuration, notes, status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (data["name"], data.get("phone", ""), data.get("property_type", ""),
+         data.get("location", ""), float(data.get("budget_min") or 0),
+         float(data.get("budget_max") or 0), data.get("configuration", ""),
+         data.get("notes", ""), data.get("status", "Inquiry"))
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM clients WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    return jsonify(dict(row)), 201
+
+
+@app.route("/api/clients/<int:client_id>", methods=["PUT"])
+@login_required
+def update_client(client_id):
+    data = request.get_json()
+    db = get_db()
+    db.execute(
+        "UPDATE clients SET name=?, phone=?, property_type=?, location=?, budget_min=?, budget_max=?, "
+        "configuration=?, notes=?, status=? WHERE id=?",
+        (data["name"], data.get("phone", ""), data.get("property_type", ""),
+         data.get("location", ""), float(data.get("budget_min") or 0),
+         float(data.get("budget_max") or 0), data.get("configuration", ""),
+         data.get("notes", ""), data["status"], client_id)
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
+    return jsonify(dict(row))
+
+
+@app.route("/api/clients/<int:client_id>", methods=["DELETE"])
+@login_required
+def delete_client(client_id):
+    db = get_db()
+    db.execute("DELETE FROM clients WHERE id = ?", (client_id,))
+    db.commit()
+    return jsonify({"success": True})
 
 
 # ─── Follow-ups ─────────────────────────────────────────────────────────────

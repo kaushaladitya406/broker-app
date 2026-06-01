@@ -345,6 +345,93 @@ td {
   border: 1px solid var(--border);
 }
 
+/* ─── Filter Pills ──────────────────────────────────────────────────────── */
+.filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-pill {
+  background: var(--soft);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: all 0.12s;
+  font-family: inherit;
+}
+.filter-pill:hover { background: var(--border); color: var(--text); }
+.filter-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+/* ─── Clients List & Cards ──────────────────────────────────────────────── */
+.clients-list { display: flex; flex-direction: column; gap: 10px; }
+.client-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+.client-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+.client-card-head {
+  padding: 12px 14px 10px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--soft);
+}
+.client-card-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.client-card-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.client-card-phone { font-size: 13px; color: var(--primary); text-decoration: none; }
+.client-card-phone:hover { text-decoration: underline; }
+.client-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex-shrink: 0; }
+.client-card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.client-card-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
+.client-detail-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
+.client-detail-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.4px; min-width: 52px; flex-shrink: 0; padding-top: 1px; }
+.client-detail-value { color: var(--text-2); }
+.client-card-footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--soft);
+  gap: 8px;
+}
+/* Client status badges */
+.badge-client-active { background: #dcfce7; color: #15803d; }
+.badge-client-inquiry { background: #dbeafe; color: #1d4ed8; }
+.badge-client-closed { background: var(--soft); color: var(--text-3); border: 1px solid var(--border); }
+/* Match badge on client cards */
+.client-match-badge {
+  display: inline-flex;
+  align-items: center;
+  background: var(--success-light);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.12s;
+}
+.client-match-badge:hover { opacity: 0.8; }
+.client-no-match {
+  display: inline-flex;
+  align-items: center;
+  background: var(--soft);
+  color: var(--text-3);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
 /* ─── Buttons ───────────────────────────────────────────────────────── */
 .btn-primary {
   background: var(--primary);

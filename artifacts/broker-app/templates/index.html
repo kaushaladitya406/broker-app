@@ -18,8 +18,7 @@
       <button class="topnav-item active" id="nav-dashboard" onclick="showTab('dashboard')">Dashboard</button>
       <button class="topnav-item" id="nav-inventory" onclick="showTab('inventory')">Inventory</button>
       <button class="topnav-item" id="nav-matcher" onclick="showTab('matcher')">AI Matcher</button>
-      <button class="topnav-item" id="nav-buyers" onclick="showTab('buyers')">Buyers</button>
-      <button class="topnav-item" id="nav-inquiries" onclick="showTab('inquiries')">Inquiries</button>
+      <button class="topnav-item" id="nav-clients" onclick="showTab('clients')">Clients</button>
       <button class="topnav-item" id="nav-followups" onclick="showTab('followups')">Follow-ups<span class="nav-badge" id="sidebarOverdueBadge" style="display:none"></span></button>
       <button class="topnav-item" id="nav-settings" onclick="showTab('settings')">Settings</button>
     </div>
@@ -65,17 +64,17 @@
       </div>
 
       <div class="summary-row">
-        <div class="summary-card" onclick="showTab('buyers')">
-          <div class="summary-card-value" id="dashBuyersCount">—</div>
-          <div class="summary-card-label">Saved Buyers</div>
+        <div class="summary-card" onclick="showTab('clients')">
+          <div class="summary-card-value" id="dashClientsTotal">—</div>
+          <div class="summary-card-label">Total Clients</div>
+        </div>
+        <div class="summary-card" onclick="showTab('clients')">
+          <div class="summary-card-value" id="dashClientsActive">—</div>
+          <div class="summary-card-label">Active Clients</div>
         </div>
         <div class="summary-card" onclick="showTab('followups')">
           <div class="summary-card-value" id="dashFollowupsCount">—</div>
           <div class="summary-card-label">Pending Follow-ups</div>
-        </div>
-        <div class="summary-card" onclick="showTab('inquiries')">
-          <div class="summary-card-value" id="dashInqCount">—</div>
-          <div class="summary-card-label">New Inquiries</div>
         </div>
       </div>
 
@@ -170,59 +169,38 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
       </div>
     </div>
 
-    <!-- ─── BUYERS ──────────────────────────────────── -->
-    <div class="tab-panel" id="panel-buyers">
+    <!-- ─── CLIENTS ─────────────────────────────────── -->
+    <div class="tab-panel" id="panel-clients">
       <div class="page-header">
-        <div class="page-title">Buyers</div>
-        <button class="btn-primary" onclick="openAddBuyerModal()">+ Add Buyer</button>
-      </div>
-      <div class="section">
-        <div class="buyers-grid" id="buyersGrid">
-          <div class="empty-state" style="grid-column:1/-1">
-            <div class="empty-state-title">Loading...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ─── INQUIRIES ───────────────────────────────── -->
-    <div class="tab-panel" id="panel-inquiries">
-      <div class="page-header">
-        <div class="page-title">Inquiries</div>
+        <div class="page-title">Clients</div>
+        <button class="btn-primary" onclick="openAddClientModal()">+ Add Client</button>
       </div>
       <div class="stats-grid" style="margin-bottom:16px">
-        <div class="stat-card stat-card-blue">
-          <div class="stat-value" id="inqStatTotal">—</div>
-          <div class="stat-label">Total</div>
-        </div>
         <div class="stat-card stat-card-green">
-          <div class="stat-value" id="inqStatNew">—</div>
-          <div class="stat-label">New</div>
+          <div class="stat-value" id="clientStatActive">—</div>
+          <div class="stat-label">Active</div>
         </div>
-        <div class="stat-card stat-card-orange">
-          <div class="stat-value" id="inqStatProgress">—</div>
-          <div class="stat-label">In Progress</div>
+        <div class="stat-card stat-card-blue">
+          <div class="stat-value" id="clientStatInquiry">—</div>
+          <div class="stat-label">Inquiry</div>
         </div>
         <div class="stat-card stat-card-purple">
-          <div class="stat-value" id="inqStatClosed">—</div>
+          <div class="stat-value" id="clientStatClosed">—</div>
           <div class="stat-label">Closed</div>
         </div>
       </div>
       <div class="section">
         <div class="section-header">
-          <div class="section-title">Client Inquiries</div>
-          <div class="filters-row">
-            <select id="inqStatusFilter" class="filter-select">
-              <option value="">All Status</option>
-              <option>New</option><option>In Progress</option><option>Closed</option><option>Lost</option>
-            </select>
+          <div class="section-title">All Clients</div>
+          <div class="filter-pills" id="clientFilterPills">
+            <button class="filter-pill active" onclick="setClientFilter(this, '')">All</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Active')">Active</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Inquiry')">Inquiry</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Closed')">Closed</button>
           </div>
         </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Client</th><th>Message</th><th>Matched</th><th>Status</th><th>Date / Notes</th><th>Actions</th></tr></thead>
-            <tbody id="inquiriesBody"><tr><td colspan="6" class="empty-row">Loading...</td></tr></tbody>
-          </table>
+        <div class="clients-list" id="clientsList">
+          <div class="empty-state"><div class="empty-state-title">Loading...</div></div>
         </div>
       </div>
     </div>
@@ -305,11 +283,8 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
     <button class="bottom-tab" id="btab-matcher" onclick="showTab('matcher')">
       <span class="btab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 7 10 11 10 7 18"/></svg></span>
     </button>
-    <button class="bottom-tab" id="btab-buyers" onclick="showTab('buyers')">
+    <button class="bottom-tab" id="btab-clients" onclick="showTab('clients')">
       <span class="btab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="7" r="3"/><path d="M4 17c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></span>
-    </button>
-    <button class="bottom-tab" id="btab-inquiries" onclick="showTab('inquiries')">
-      <span class="btab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3H6a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V8z"/><polyline points="11 3 11 8 16 8"/><line x1="8" y1="11" x2="13" y2="11"/><line x1="8" y1="14" x2="11" y2="14"/></svg></span>
     </button>
     <button class="bottom-tab" id="btab-followups" onclick="showTab('followups')">
       <span class="btab-icon"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7"/><polyline points="10 6 10 10 13 12"/></svg></span>
@@ -405,25 +380,24 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
   </div>
 </div>
 
-<!-- ─── SAVE INQUIRY MODAL ───────────────── -->
+<!-- ─── SAVE AS CLIENT MODAL ─────────────── -->
 <div class="modal-overlay" id="saveInquiryModal">
   <div class="modal">
     <div class="modal-header">
-      <h3>Save as Inquiry</h3>
+      <h3>Save as Client</h3>
       <button class="modal-close" onclick="closeSaveInquiryModal()">&#x2715;</button>
     </div>
     <form id="saveInquiryForm">
       <div class="modal-body">
-        <div class="form-group">
-          <label>Client Name</label>
-          <input type="text" id="inqClientName" placeholder="e.g. Rajesh Kumar" required />
-        </div>
-        <div class="form-group">
-          <label>Status</label>
-          <select id="inqStatus">
-            <option value="New">New</option><option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option><option value="Lost">Lost</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Client Name</label>
+            <input type="text" id="inqClientName" placeholder="e.g. Rajesh Kumar" required />
+          </div>
+          <div class="form-group">
+            <label>Phone <span class="label-hint">(optional)</span></label>
+            <input type="tel" id="inqClientPhone" placeholder="e.g. 9876543210" />
+          </div>
         </div>
         <div class="form-group">
           <label>Notes</label>
@@ -432,96 +406,96 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
       </div>
       <div class="modal-footer">
         <button type="button" class="btn-cancel" onclick="closeSaveInquiryModal()">Cancel</button>
-        <button type="submit" class="btn-primary" id="saveInquiryBtn">Save</button>
+        <button type="submit" class="btn-primary" id="saveInquiryBtn">Save Client</button>
       </div>
     </form>
   </div>
 </div>
 
-<!-- ─── EDIT INQUIRY MODAL ───────────────── -->
-<div class="modal-overlay" id="editInquiryModal">
-  <div class="modal">
+<!-- ─── CLIENT MATCH MODAL ───────────────── -->
+<div class="modal-overlay" id="clientMatchModal">
+  <div class="modal modal-wide">
     <div class="modal-header">
-      <h3>Edit Inquiry</h3>
-      <button class="modal-close" onclick="closeEditInquiryModal()">&#x2715;</button>
+      <h3 id="clientMatchTitle">Matching Properties</h3>
+      <button class="modal-close" onclick="closeClientMatchModal()">&#x2715;</button>
     </div>
-    <form id="editInquiryForm">
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Client Name</label>
-          <input type="text" id="editInqClientName" required />
-        </div>
-        <div class="form-group">
-          <label>Status</label>
-          <select id="editInqStatus">
-            <option value="New">New</option><option value="In Progress">In Progress</option>
-            <option value="Closed">Closed</option><option value="Lost">Lost</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Notes</label>
-          <input type="text" id="editInqNotes" placeholder="Follow-up notes..." />
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn-cancel" onclick="closeEditInquiryModal()">Cancel</button>
-        <button type="submit" class="btn-primary" id="updateInquiryBtn">Save</button>
-      </div>
-    </form>
+    <div class="modal-body">
+      <p id="clientMatchDesc" style="color:var(--text-2);font-size:14px;margin-bottom:12px;"></p>
+      <div id="clientMatchList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-primary" onclick="closeClientMatchModal()">Close</button>
+    </div>
   </div>
 </div>
 
-<!-- ─── ADD BUYER MODAL ──────────────────── -->
-<div class="modal-overlay" id="addBuyerModal">
+<!-- ─── ADD/EDIT CLIENT MODAL ────────────── -->
+<div class="modal-overlay" id="addClientModal">
   <div class="modal">
     <div class="modal-header">
-      <h3 id="buyerModalTitle">Add Buyer</h3>
-      <button class="modal-close" onclick="closeAddBuyerModal()">&#x2715;</button>
+      <h3 id="clientModalTitle">Add Client</h3>
+      <button class="modal-close" onclick="closeAddClientModal()">&#x2715;</button>
     </div>
-    <form id="buyerForm">
+    <form id="clientForm">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
             <label>Name</label>
-            <input type="text" id="buyerName" placeholder="e.g. Harpreet Singh" required />
+            <input type="text" id="clientName" placeholder="e.g. Harpreet Singh" required />
           </div>
           <div class="form-group">
             <label>Phone</label>
-            <input type="tel" id="buyerPhone" placeholder="e.g. 9876543210" required />
+            <input type="tel" id="clientPhone" placeholder="e.g. 9876543210" />
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Property Type</label>
-            <select id="buyerType">
+            <select id="clientType">
               <option value="">Any type</option>
               <option>Apartment</option><option>House</option><option>Villa</option>
               <option>Office</option><option>Shop</option><option>Land</option><option>Warehouse</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Location</label>
-            <input type="text" id="buyerLocation" placeholder="e.g. Mohali" />
+            <label>Configuration</label>
+            <select id="clientConfig">
+              <option value="">Any</option>
+              <option>1BHK</option><option>2BHK</option><option>3BHK</option>
+              <option>4BHK+</option><option>Shop/Office</option><option>Plot</option><option>Other</option>
+            </select>
           </div>
+        </div>
+        <div class="form-group">
+          <label>Preferred Location</label>
+          <input type="text" id="clientLocation" placeholder="e.g. Mohali, Chandigarh" />
         </div>
         <div class="form-row">
           <div class="form-group">
             <label>Budget Min (Rs)</label>
-            <input type="number" id="buyerBudgetMin" placeholder="e.g. 4000000" min="0" />
+            <input type="number" id="clientBudgetMin" placeholder="e.g. 4000000" min="0" />
           </div>
           <div class="form-group">
             <label>Budget Max (Rs)</label>
-            <input type="number" id="buyerBudgetMax" placeholder="e.g. 8000000" min="0" />
+            <input type="number" id="clientBudgetMax" placeholder="e.g. 8000000" min="0" />
           </div>
         </div>
         <div class="form-group">
-          <label>Notes</label>
-          <input type="text" id="buyerNotes" placeholder="Any extra requirements..." />
+          <label>Status</label>
+          <select id="clientStatus">
+            <option value="Active">Active — serious buyer, auto-matched to inventory</option>
+            <option value="Inquiry" selected>Inquiry — asked about a property</option>
+            <option value="Closed">Closed — deal done or dropped</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Notes / Requirements</label>
+          <input type="text" id="clientNotes" placeholder="e.g. Ready to move, needs covered parking" />
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn-cancel" onclick="closeAddBuyerModal()">Cancel</button>
-        <button type="submit" class="btn-primary" id="saveBuyerBtn">Save</button>
+        <button type="button" class="btn-cancel" onclick="closeAddClientModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="saveClientBtn">Save Client</button>
       </div>
     </form>
   </div>

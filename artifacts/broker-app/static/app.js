@@ -1,13 +1,12 @@
 const API = "";
 
 let allProperties = [];
-let allInquiries = [];
-let allBuyers = [];
+let allClients = [];
 let allFollowups = [];
 let editingId = null;
-let editingInquiryId = null;
-let editingBuyerId = null;
+let editingClientId = null;
 let editingFollowupId = null;
+let clientFilter = "";
 let lastMatchedIds = [];
 let lastMatchMessage = "";
 let brokerProfile = { broker_name: "", broker_phone: "", broker_tagline: "" };
@@ -79,8 +78,7 @@ function showTab(tab) {
   if (panel) panel.classList.add("active");
   if (tab === "dashboard") renderDashboard();
   if (tab === "inventory") fetchProperties();
-  if (tab === "inquiries") fetchInquiries();
-  if (tab === "buyers") fetchBuyers();
+  if (tab === "clients") fetchClients();
   if (tab === "followups") fetchFollowups();
   if (tab === "settings") fetchSettings();
 }
@@ -469,8 +467,8 @@ async function matchProperties() {
 
 function openSaveInquiryModal() {
   document.getElementById("inqClientName").value = "";
+  document.getElementById("inqClientPhone").value = "";
   document.getElementById("inqNotes").value = "";
-  document.getElementById("inqStatus").value = "New";
   document.getElementById("saveInquiryModal").classList.add("open");
 }
 function closeSaveInquiryModal() { document.getElementById("saveInquiryModal").classList.remove("open"); }
@@ -478,220 +476,197 @@ function closeSaveInquiryModal() { document.getElementById("saveInquiryModal").c
 async function saveInquiry(e) {
   e.preventDefault();
   const payload = {
-    client_name: document.getElementById("inqClientName").value.trim(),
-    whatsapp_message: lastMatchMessage,
-    matched_property_ids: lastMatchedIds,
+    name: document.getElementById("inqClientName").value.trim(),
+    phone: document.getElementById("inqClientPhone").value.trim(),
     notes: document.getElementById("inqNotes").value.trim(),
-    status: document.getElementById("inqStatus").value,
+    status: "Inquiry",
   };
-  if (!payload.client_name) return;
+  if (!payload.name) return;
   const btn = document.getElementById("saveInquiryBtn");
   btn.disabled = true; btn.textContent = "Saving...";
   try {
-    await apiFetch(`${API}/api/inquiries`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    await apiFetch(`${API}/api/clients`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     closeSaveInquiryModal();
-    showTab("inquiries");
-  } finally { btn.disabled = false; btn.textContent = "Save Inquiry"; }
+    await fetchClients();
+    showTab("clients");
+  } finally { btn.disabled = false; btn.textContent = "Save Client"; }
 }
 
-// ─── Inquiries ────────────────────────────────────────────────────────────────
+// ─── Clients ──────────────────────────────────────────────────────────────────
 
-async function fetchInquiries() {
-  const statusFilter = document.getElementById("inqStatusFilter")?.value || "";
-  const params = new URLSearchParams();
-  if (statusFilter) params.set("status", statusFilter);
-  const res = await apiFetch(`${API}/api/inquiries?${params}`);
+async function fetchClients() {
+  const res = await apiFetch(`${API}/api/clients`);
   if (!res) return;
-  allInquiries = await res.json();
-  renderInquiries(allInquiries);
-  updateInquiryStats();
+  allClients = await res.json();
+  updateClientStats();
+  renderClients();
 }
 
-function updateInquiryStats() {
-  document.getElementById("inqStatTotal").textContent = allInquiries.length;
-  document.getElementById("inqStatNew").textContent = allInquiries.filter(i => i.status === "New").length;
-  document.getElementById("inqStatProgress").textContent = allInquiries.filter(i => i.status === "In Progress").length;
-  document.getElementById("inqStatClosed").textContent = allInquiries.filter(i => i.status === "Closed").length;
+function updateClientStats() {
+  const el = id => document.getElementById(id);
+  if (el("clientStatActive")) el("clientStatActive").textContent = allClients.filter(c => c.status === "Active").length;
+  if (el("clientStatInquiry")) el("clientStatInquiry").textContent = allClients.filter(c => c.status === "Inquiry").length;
+  if (el("clientStatClosed")) el("clientStatClosed").textContent = allClients.filter(c => c.status === "Closed").length;
 }
 
-function inquiryStatusBadge(status) {
-  const map = { New: "badge-inq-new", "In Progress": "badge-inq-progress", Closed: "badge-inq-closed", Lost: "badge-inq-lost" };
-  return `<span class="badge ${map[status] || "badge-inq-new"}">${status}</span>`;
+function setClientFilter(btn, filter) {
+  clientFilter = filter;
+  document.querySelectorAll(".filter-pill").forEach(p => p.classList.remove("active"));
+  btn.classList.add("active");
+  renderClients();
 }
 
-function renderInquiries(inquiries) {
-  const tbody = document.getElementById("inquiriesBody");
-  if (!Array.isArray(inquiries) || inquiries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><div class="empty-state"><div class="empty-state-title">No inquiries yet</div><div class="empty-state-msg">Use the AI Matcher tab to match a client's message to properties, then save the result as an inquiry.</div><button class="btn-primary" onclick="showTab('matcher')">Go to AI Matcher</button></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = inquiries.map(inq => {
-    const date = new Date(inq.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    const propCount = Array.isArray(inq.matched_property_ids) ? inq.matched_property_ids.length : 0;
-    const shortMsg = inq.whatsapp_message.length > 60 ? inq.whatsapp_message.slice(0, 60) + "…" : inq.whatsapp_message;
-    return `<tr class="prop-row">
-      <td data-label="Client"><strong>${inq.client_name}</strong></td>
-      <td data-label="Message" class="msg-cell" title="${inq.whatsapp_message}">${shortMsg}</td>
-      <td data-label="Matched"><span class="prop-count-badge">${propCount} propert${propCount !== 1 ? "ies" : "y"}</span></td>
-      <td data-label="Status">${inquiryStatusBadge(inq.status)}</td>
-      <td data-label="Date"><div class="inq-meta">${date}</div>${inq.notes ? `<div class="inq-notes">${inq.notes}</div>` : ""}</td>
-      <td class="actions-cell">
-        <button class="btn-icon btn-edit" onclick="openEditInquiry(${inq.id})" title="Edit">Edit</button>
-        <button class="btn-icon btn-delete" onclick="deleteInquiry(${inq.id})" title="Delete">Del</button>
-      </td>
-    </tr>`;
-  }).join("");
-}
-
-function openEditInquiry(id) {
-  const inq = allInquiries.find(x => x.id === id);
-  if (!inq) return;
-  editingInquiryId = id;
-  document.getElementById("editInqClientName").value = inq.client_name;
-  document.getElementById("editInqNotes").value = inq.notes || "";
-  document.getElementById("editInqStatus").value = inq.status;
-  document.getElementById("editInquiryModal").classList.add("open");
-}
-function closeEditInquiryModal() { document.getElementById("editInquiryModal").classList.remove("open"); editingInquiryId = null; }
-
-async function updateInquiry(e) {
-  e.preventDefault();
-  const payload = {
-    client_name: document.getElementById("editInqClientName").value.trim(),
-    notes: document.getElementById("editInqNotes").value.trim(),
-    status: document.getElementById("editInqStatus").value,
-  };
-  const btn = document.getElementById("updateInquiryBtn");
-  btn.disabled = true; btn.textContent = "Saving...";
-  try {
-    await apiFetch(`${API}/api/inquiries/${editingInquiryId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
-    closeEditInquiryModal();
-    await fetchInquiries();
-  } finally { btn.disabled = false; btn.textContent = "Save Changes"; }
-}
-
-async function deleteInquiry(id) {
-  if (!confirm("Delete this inquiry?")) return;
-  await apiFetch(`${API}/api/inquiries/${id}`, { method: "DELETE" });
-  await fetchInquiries();
-}
-
-// ─── Buyers ───────────────────────────────────────────────────────────────────
-
-async function fetchBuyers() {
-  const res = await apiFetch(`${API}/api/buyers`);
-  if (!res) return;
-  allBuyers = await res.json();
-  renderBuyers(allBuyers);
-}
-
-function countBuyerMatches(b) {
+function getClientMatches(c) {
+  if (c.status !== "Active") return [];
   return allProperties.filter(p => {
     if (p.status !== "Available") return false;
-    if (b.property_type && p.property_type !== b.property_type) return false;
-    if (b.location && !p.location.toLowerCase().includes(b.location.toLowerCase())) return false;
-    if (b.budget_max && p.price > b.budget_max) return false;
-    if (b.budget_min && p.price < b.budget_min) return false;
+    if (c.property_type && p.property_type !== c.property_type) return false;
+    if (c.configuration && p.configuration !== c.configuration) return false;
+    if (c.location && !p.location.toLowerCase().includes(c.location.toLowerCase())) return false;
+    if (c.budget_max && c.budget_max > 0 && p.price > c.budget_max) return false;
+    if (c.budget_min && c.budget_min > 0 && p.price < c.budget_min) return false;
     return true;
-  }).length;
+  });
 }
 
-function renderBuyers(buyers) {
-  const grid = document.getElementById("buyersGrid");
-  if (!Array.isArray(buyers) || buyers.length === 0) {
-    grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-state-title">No buyers saved yet</div>
-        <div class="empty-state-msg">Add buyers to receive auto-match alerts when a property matching their requirements is added.</div>
-        <button class="btn-primary" onclick="openAddBuyerModal()">+ Add Buyer</button>
-      </div>`;
+function clientStatusBadge(status) {
+  const map = { Active: "badge-client-active", Inquiry: "badge-client-inquiry", Closed: "badge-client-closed" };
+  return `<span class="badge ${map[status] || "badge-client-inquiry"}">${status}</span>`;
+}
+
+function renderClients() {
+  const list = document.getElementById("clientsList");
+  if (!list) return;
+  const filtered = clientFilter ? allClients.filter(c => c.status === clientFilter) : allClients;
+  if (filtered.length === 0) {
+    const emptyMsg = clientFilter ? `No ${clientFilter.toLowerCase()} clients.` : "No clients yet. Add buyers and leads here.";
+    list.innerHTML = `<div class="empty-state"><div class="empty-state-title">${emptyMsg}</div>${!clientFilter ? `<button class="btn-primary" onclick="openAddClientModal()">+ Add Client</button>` : ""}</div>`;
     return;
   }
-  grid.innerHTML = buyers.map(b => {
-    const matchCount = countBuyerMatches(b);
-    const matchBadge = matchCount > 0
-      ? `<span class="buyer-matches-badge">${matchCount} match${matchCount !== 1 ? "es" : ""}</span>`
-      : `<span class="buyer-no-match-badge">No matches</span>`;
-    const budgetText = (b.budget_min || b.budget_max)
-      ? `${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}`
-      : "Not set";
+  list.innerHTML = filtered.map(c => {
+    const matches = getClientMatches(c);
+    const matchBadge = c.status === "Active"
+      ? (matches.length > 0
+          ? `<button class="client-match-badge" onclick="showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
+          : `<span class="client-no-match">No matches</span>`)
+      : "";
+    const budgetText = (c.budget_min || c.budget_max)
+      ? `${c.budget_min ? formatPrice(c.budget_min) : "Any"} – ${c.budget_max ? formatPrice(c.budget_max) : "Any"}`
+      : null;
+    const lookingFor = [c.configuration, c.property_type].filter(Boolean).join(" ") || "";
+    const lookingForFull = [lookingFor, c.location].filter(Boolean).join(" in ") || null;
+    const waHref = c.phone
+      ? `https://wa.me/${c.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${c.name}!`)}`
+      : null;
     return `
-      <div class="buyer-card">
-        <div class="buyer-card-head">
-          <div>
-            <div class="buyer-card-name">${b.name}</div>
-            <a href="tel:${b.phone}" class="buyer-card-phone">${b.phone}</a>
+      <div class="client-card">
+        <div class="client-card-head">
+          <div class="client-card-info">
+            <span class="client-card-name">${c.name}</span>
+            ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone">${c.phone}</a>` : ""}
           </div>
-          <div class="buyer-card-actions">
-            <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">Edit</button>
-            <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">Del</button>
+          <div class="client-card-meta">
+            ${clientStatusBadge(c.status)}
+            ${matchBadge}
+          </div>
+          <div class="client-card-actions">
+            <button class="btn-icon btn-edit" onclick="openEditClientModal(${c.id})">Edit</button>
+            <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Del</button>
           </div>
         </div>
-        <div class="buyer-card-body">
-          ${b.property_type ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Type</span><span class="type-tag">${b.property_type}</span></div>` : ""}
-          ${b.location ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Location</span><span class="buyer-detail-value">${b.location}</span></div>` : ""}
-          <div class="buyer-detail-row"><span class="buyer-detail-label">Budget</span><span class="buyer-detail-value">${budgetText}</span></div>
-          ${b.notes ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Notes</span><span class="buyer-detail-value">${b.notes}</span></div>` : ""}
-        </div>
-        <div class="buyer-card-footer">
-          ${matchBadge}
+        ${lookingForFull || budgetText || c.notes ? `
+        <div class="client-card-body">
+          ${lookingForFull ? `<div class="client-detail-row"><span class="client-detail-label">Needs</span><span class="client-detail-value">${lookingForFull}</span></div>` : ""}
+          ${budgetText ? `<div class="client-detail-row"><span class="client-detail-label">Budget</span><span class="client-detail-value">${budgetText}</span></div>` : ""}
+          ${c.notes ? `<div class="client-detail-row"><span class="client-detail-label">Notes</span><span class="client-detail-value">${c.notes}</span></div>` : ""}
+        </div>` : ""}
+        <div class="client-card-footer">
+          ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>` : "<span></span>"}
+          <div style="display:flex;gap:6px;">
+            <button class="btn-sm-icon edit" onclick="openEditClientModal(${c.id})">Edit</button>
+            <button class="btn-sm-icon del" onclick="deleteClient(${c.id})">Del</button>
+          </div>
         </div>
       </div>`;
   }).join("");
 }
 
-function openAddBuyerModal() {
-  editingBuyerId = null;
-  document.getElementById("buyerModalTitle").textContent = "Add Buyer";
-  document.getElementById("buyerForm").reset();
-  document.getElementById("addBuyerModal").classList.add("open");
+function showClientMatches(id) {
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  const matches = getClientMatches(c);
+  document.getElementById("clientMatchTitle").textContent = `Matches for ${c.name}`;
+  document.getElementById("clientMatchDesc").textContent = `${matches.length} available propert${matches.length !== 1 ? "ies" : "y"} match${matches.length === 1 ? "es" : ""} their requirements.`;
+  document.getElementById("clientMatchList").innerHTML = matches.map(p => `
+    <div class="buyer-match-item">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${p.configuration} ${p.property_type}</div>
+        <div style="font-size:13px;color:var(--text-2);">${p.location}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${formatArea(p)} · ${formatPrice(p.price)} · ${p.status}</div>
+      </div>
+      ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${c.name}! I have a property that matches your requirements: ${p.configuration} ${p.property_type} in ${p.location}, ${formatArea(p)} at ${formatPrice(p.price)}. Interested?`)}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
+    </div>`).join("");
+  document.getElementById("clientMatchModal").classList.add("open");
+}
+function closeClientMatchModal() { document.getElementById("clientMatchModal").classList.remove("open"); }
+
+function openAddClientModal() {
+  editingClientId = null;
+  document.getElementById("clientModalTitle").textContent = "Add Client";
+  document.getElementById("clientForm").reset();
+  document.getElementById("clientStatus").value = "Inquiry";
+  document.getElementById("addClientModal").classList.add("open");
 }
 
-function openEditBuyerModal(id) {
-  const b = allBuyers.find(x => x.id === id);
-  if (!b) return;
-  editingBuyerId = id;
-  document.getElementById("buyerModalTitle").textContent = "Edit Buyer";
-  document.getElementById("buyerName").value = b.name;
-  document.getElementById("buyerPhone").value = b.phone;
-  document.getElementById("buyerType").value = b.property_type || "";
-  document.getElementById("buyerLocation").value = b.location || "";
-  document.getElementById("buyerBudgetMin").value = b.budget_min || "";
-  document.getElementById("buyerBudgetMax").value = b.budget_max || "";
-  document.getElementById("buyerNotes").value = b.notes || "";
-  document.getElementById("addBuyerModal").classList.add("open");
+function openEditClientModal(id) {
+  const c = allClients.find(x => x.id === id);
+  if (!c) return;
+  editingClientId = id;
+  document.getElementById("clientModalTitle").textContent = "Edit Client";
+  document.getElementById("clientName").value = c.name;
+  document.getElementById("clientPhone").value = c.phone || "";
+  document.getElementById("clientType").value = c.property_type || "";
+  document.getElementById("clientConfig").value = c.configuration || "";
+  document.getElementById("clientLocation").value = c.location || "";
+  document.getElementById("clientBudgetMin").value = c.budget_min || "";
+  document.getElementById("clientBudgetMax").value = c.budget_max || "";
+  document.getElementById("clientStatus").value = c.status;
+  document.getElementById("clientNotes").value = c.notes || "";
+  document.getElementById("addClientModal").classList.add("open");
 }
 
-function closeAddBuyerModal() { document.getElementById("addBuyerModal").classList.remove("open"); editingBuyerId = null; }
+function closeAddClientModal() { document.getElementById("addClientModal").classList.remove("open"); editingClientId = null; }
 
-async function saveBuyer(e) {
+async function saveClient(e) {
   e.preventDefault();
   const payload = {
-    name: document.getElementById("buyerName").value.trim(),
-    phone: document.getElementById("buyerPhone").value.trim(),
-    property_type: document.getElementById("buyerType").value,
-    location: document.getElementById("buyerLocation").value.trim(),
-    budget_min: document.getElementById("buyerBudgetMin").value || 0,
-    budget_max: document.getElementById("buyerBudgetMax").value || 0,
-    notes: document.getElementById("buyerNotes").value.trim(),
+    name: document.getElementById("clientName").value.trim(),
+    phone: document.getElementById("clientPhone").value.trim(),
+    property_type: document.getElementById("clientType").value,
+    configuration: document.getElementById("clientConfig").value,
+    location: document.getElementById("clientLocation").value.trim(),
+    budget_min: document.getElementById("clientBudgetMin").value || 0,
+    budget_max: document.getElementById("clientBudgetMax").value || 0,
+    status: document.getElementById("clientStatus").value,
+    notes: document.getElementById("clientNotes").value.trim(),
   };
-  const btn = document.getElementById("saveBuyerBtn");
+  const btn = document.getElementById("saveClientBtn");
   btn.disabled = true; btn.textContent = "Saving...";
   try {
-    if (editingBuyerId) {
-      await apiFetch(`${API}/api/buyers/${editingBuyerId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (editingClientId) {
+      await apiFetch(`${API}/api/clients/${editingClientId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     } else {
-      await apiFetch(`${API}/api/buyers`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      await apiFetch(`${API}/api/clients`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     }
-    closeAddBuyerModal();
-    await fetchBuyers();
-  } finally { btn.disabled = false; btn.textContent = "Save Buyer"; }
+    closeAddClientModal();
+    await fetchClients();
+  } finally { btn.disabled = false; btn.textContent = "Save Client"; }
 }
 
-async function deleteBuyer(id) {
-  if (!confirm("Delete this buyer?")) return;
-  await apiFetch(`${API}/api/buyers/${id}`, { method: "DELETE" });
-  await fetchBuyers();
+async function deleteClient(id) {
+  if (!confirm("Delete this client?")) return;
+  await apiFetch(`${API}/api/clients/${id}`, { method: "DELETE" });
+  await fetchClients();
 }
 
 // ─── Follow-ups ───────────────────────────────────────────────────────────────
@@ -721,17 +696,14 @@ function updateOverdueBadge(followups) {
 // ─── Dashboard ────────────────────────────────────────────────────────────────
 
 function renderDashboard() {
-  const buyersEl = document.getElementById("dashBuyersCount");
+  const totalEl = document.getElementById("dashClientsTotal");
+  const activeEl = document.getElementById("dashClientsActive");
   const followupsEl = document.getElementById("dashFollowupsCount");
-  const inqEl = document.getElementById("dashInqCount");
-  if (buyersEl) buyersEl.textContent = allBuyers.length;
+  if (totalEl) totalEl.textContent = allClients.length;
+  if (activeEl) activeEl.textContent = allClients.filter(c => c.status === "Active").length;
   if (followupsEl) {
     const pending = allFollowups.filter(f => f.status === "Pending" && f.reminder_date <= TODAY).length;
     followupsEl.textContent = pending;
-  }
-  if (inqEl) {
-    const newInq = allInquiries.filter(i => i.status === "New").length;
-    inqEl.textContent = newInq;
   }
   const recentEl = document.getElementById("dashRecentProps");
   if (!recentEl) return;
@@ -1037,9 +1009,7 @@ document.getElementById("statusFilter").addEventListener("change", fetchProperti
 document.getElementById("typeFilter").addEventListener("change", fetchProperties);
 document.getElementById("propForm").addEventListener("submit", saveProperty);
 document.getElementById("saveInquiryForm").addEventListener("submit", saveInquiry);
-document.getElementById("editInquiryForm").addEventListener("submit", updateInquiry);
-document.getElementById("inqStatusFilter").addEventListener("change", fetchInquiries);
-document.getElementById("buyerForm").addEventListener("submit", saveBuyer);
+document.getElementById("clientForm").addEventListener("submit", saveClient);
 document.getElementById("followupForm").addEventListener("submit", saveFollowup);
 document.getElementById("settingsForm").addEventListener("submit", saveSettings);
 
@@ -1052,7 +1022,7 @@ document.getElementById("settingName").addEventListener("input", updateSettingsP
 document.getElementById("settingPhone").addEventListener("input", updateSettingsPreview);
 document.getElementById("settingTagline").addEventListener("input", updateSettingsPreview);
 
-["propModal","saveInquiryModal","editInquiryModal","addBuyerModal","addFollowupModal","buyerMatchModal"].forEach(id => {
+["propModal","saveInquiryModal","addClientModal","clientMatchModal","addFollowupModal","buyerMatchModal"].forEach(id => {
   document.getElementById(id).addEventListener("click", function(e) { if (e.target === this) this.classList.remove("open"); });
 });
 
@@ -1061,8 +1031,7 @@ document.getElementById("settingTagline").addEventListener("input", updateSettin
 async function initApp() {
   await fetchProperties();
   await Promise.all([
-    fetchBuyers(),
-    fetchInquiries(),
+    fetchClients(),
     fetchFollowups(),
     fetchSettings(),
   ]);

@@ -40,9 +40,9 @@ A Flask-based property management dashboard for real estate brokers — manage i
 
 - **Inventory Management**: Add, edit, delete properties (type, location, size in sq ft, price in Rs, status)
 - **Instant Search & Filter**: Search by location/type, filter by status and property type
-- **AI WhatsApp Matcher**: Paste a client's WhatsApp message → AI returns ranked matching properties with explanation; save result as inquiry
-- **Client Inquiries**: Save matched searches as inquiries with client name, status, notes
-- **Buyers Database**: Save buyer requirements (name, phone, property type, location, budget range); auto-match alert when a new property is added
+- **AI WhatsApp Matcher**: Paste a client's WhatsApp message → AI returns ranked matching properties with explanation; save result as Client (Inquiry status)
+- **Clients**: Unified buyer+inquiry database. Status: Active (serious buyer, auto-matched), Inquiry (lead), Closed. Filter pills (All/Active/Inquiry/Closed), client cards with WhatsApp button, match badge for Active clients showing available inventory matches
+- **Auto-Match Alert**: When a property is added, Active clients with matching requirements trigger a popup with WhatsApp links
 - **Follow-ups**: Log reminders with client name, note, reminder date; overdue follow-ups shown in red at top with count badge on tab
 - **Login**: Simple session auth; default admin/broker123, configurable via env vars
 
@@ -54,10 +54,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 - Always restart BrokerApp workflow after changes to app.py
 - The SQLite DB is at `artifacts/broker-app/broker.db` — delete to reset
-- `init_db()` is called at server startup — schema auto-creates on first run
-- POST /api/properties returns `{property, buyer_matches}` — frontend checks buyer_matches and shows alert modal
+- `init_db()` is called at server startup — schema auto-creates on first run; one-time migration moves buyers→clients(Active) and inquiries→clients(Inquiry) via settings key `clients_v1`
+- POST /api/properties returns `{property, buyer_matches}` — buyer_matches now queries clients WHERE status='Active'; frontend shows alert modal
 - Follow-up overdue = status=="Pending" AND reminder_date < TODAY (ISO date comparison)
 - Login credentials: BROKER_USERNAME (default: admin) / BROKER_PASSWORD (default: broker123) env vars
+- `db.row_factory = sqlite3.Row` is set at the top of `init_db()` for named-column access during migration
 
 ## Pointers
 
