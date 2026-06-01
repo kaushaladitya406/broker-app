@@ -94,16 +94,26 @@ function updateSettingsPreview() {
   const phone = document.getElementById("settingPhone")?.value?.trim() || "";
   const tagline = document.getElementById("settingTagline")?.value?.trim() || "";
   const preview = document.getElementById("settingsPreview");
+  const placeholder = document.getElementById("settingsPlaceholder");
+  const avatarEl = document.getElementById("settingsAvatar");
+  if (avatarEl) {
+    const initials = name
+      ? name.split(" ").filter(Boolean).map(w => w[0]).join("").toUpperCase().slice(0, 2)
+      : "?";
+    avatarEl.textContent = initials;
+  }
   if (!preview) return;
   if (name || phone) {
     const contact = name && phone ? `${name}: ${phone}` : name || phone;
     preview.style.display = "block";
+    if (placeholder) placeholder.style.display = "none";
     preview.innerHTML = `
       <div class="settings-preview-label">Preview in WhatsApp share:</div>
       <div class="settings-preview-text">📞 Contact ${contact}${tagline ? `\n_${tagline}_` : ""}</div>
     `;
   } else {
     preview.style.display = "none";
+    if (placeholder) placeholder.style.display = "flex";
   }
 }
 
@@ -255,7 +265,7 @@ function toggleNotes(id) {
 function renderTable(props) {
   const tbody = document.getElementById("propertiesBody");
   if (!Array.isArray(props) || props.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">No properties found. Add your first one above.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-row"><div class="empty-state"><div class="empty-state-icon">🏘️</div><div class="empty-state-title">No properties found</div><div class="empty-state-msg">Add your first property using Quick Add AI above, or click + Add Property.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div></td></tr>`;
     return;
   }
   tbody.innerHTML = props.map(p => {
@@ -500,7 +510,7 @@ function inquiryStatusBadge(status) {
 function renderInquiries(inquiries) {
   const tbody = document.getElementById("inquiriesBody");
   if (!Array.isArray(inquiries) || inquiries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-row">No inquiries yet. Use the AI matcher and save a result.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">No inquiries yet</div><div class="empty-state-msg">Use the AI Matcher tab to match a client's message to properties, then save the result as an inquiry.</div><button class="btn-primary" onclick="showTab('matcher')">Go to AI Matcher</button></div></td></tr>`;
     return;
   }
   tbody.innerHTML = inquiries.map(inq => {
@@ -563,30 +573,60 @@ async function fetchBuyers() {
   renderBuyers(allBuyers);
 }
 
+function countBuyerMatches(b) {
+  return allProperties.filter(p => {
+    if (p.status !== "Available") return false;
+    if (b.property_type && p.property_type !== b.property_type) return false;
+    if (b.location && !p.location.toLowerCase().includes(b.location.toLowerCase())) return false;
+    if (b.budget_max && p.price > b.budget_max) return false;
+    if (b.budget_min && p.price < b.budget_min) return false;
+    return true;
+  }).length;
+}
+
 function renderBuyers(buyers) {
-  const tbody = document.getElementById("buyersBody");
+  const grid = document.getElementById("buyersGrid");
   if (!Array.isArray(buyers) || buyers.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-row">No buyers saved yet. Add one above.</td></tr>`;
+    grid.innerHTML = `
+      <div class="empty-state" style="grid-column:1/-1">
+        <div class="empty-state-icon">👤</div>
+        <div class="empty-state-title">No buyers saved yet</div>
+        <div class="empty-state-msg">Add buyers to receive auto-match alerts when a property matching their requirements is added.</div>
+        <button class="btn-primary" onclick="openAddBuyerModal()">+ Add Buyer</button>
+      </div>`;
     return;
   }
-  tbody.innerHTML = buyers.map(b => `
-    <tr class="prop-row">
-      <td data-label="Name"><strong>${b.name}</strong></td>
-      <td data-label="Phone"><a href="tel:${b.phone}" class="phone-link">📞 ${b.phone}</a></td>
-      <td data-label="Type">${b.property_type ? `<span class="type-tag">${b.property_type}</span>` : '<span class="text-muted">Any</span>'}</td>
-      <td data-label="Location">${b.location || '<span class="text-muted">Any</span>'}</td>
-      <td data-label="Budget" class="budget-cell">
-        ${b.budget_min || b.budget_max
-          ? `${b.budget_min ? formatPrice(b.budget_min) : "—"} – ${b.budget_max ? formatPrice(b.budget_max) : "—"}`
-          : '<span class="text-muted">Not set</span>'}
-      </td>
-      <td data-label="Notes" class="msg-cell">${b.notes || ""}</td>
-      <td class="actions-cell">
-        <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">✏️</button>
-        <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">🗑️</button>
-      </td>
-    </tr>
-  `).join("");
+  grid.innerHTML = buyers.map(b => {
+    const matchCount = countBuyerMatches(b);
+    const matchBadge = matchCount > 0
+      ? `<span class="buyer-matches-badge">✅ ${matchCount} match${matchCount !== 1 ? "es" : ""}</span>`
+      : `<span class="buyer-no-match-badge">No matches</span>`;
+    const budgetText = (b.budget_min || b.budget_max)
+      ? `${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}`
+      : "Not set";
+    return `
+      <div class="buyer-card">
+        <div class="buyer-card-head">
+          <div>
+            <div class="buyer-card-name">👤 ${b.name}</div>
+            <a href="tel:${b.phone}" class="buyer-card-phone">📞 ${b.phone}</a>
+          </div>
+          <div class="buyer-card-actions">
+            <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">✏️</button>
+            <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">🗑️</button>
+          </div>
+        </div>
+        <div class="buyer-card-body">
+          ${b.property_type ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Type</span><span class="type-tag">${b.property_type}</span></div>` : ""}
+          ${b.location ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Location</span><span class="buyer-detail-value">📍 ${b.location}</span></div>` : ""}
+          <div class="buyer-detail-row"><span class="buyer-detail-label">Budget</span><span class="buyer-detail-value">💰 ${budgetText}</span></div>
+          ${b.notes ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Notes</span><span class="buyer-detail-value">${b.notes}</span></div>` : ""}
+        </div>
+        <div class="buyer-card-footer">
+          ${matchBadge}
+        </div>
+      </div>`;
+  }).join("");
 }
 
 function openAddBuyerModal() {
@@ -666,11 +706,17 @@ function updateOverdueBadge(followups) {
 }
 
 function renderFollowups(followups) {
-  const tbody = document.getElementById("followupsBody");
+  const container = document.getElementById("followupsCards");
   const overdueDiv = document.getElementById("overdueAlert");
 
   if (!Array.isArray(followups) || followups.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-row">No follow-ups yet. Add one above.</td></tr>`;
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">🔔</div>
+        <div class="empty-state-title">No follow-ups yet</div>
+        <div class="empty-state-msg">Add reminders to follow up with clients. Overdue reminders appear in red, today's in orange.</div>
+        <button class="btn-primary" onclick="openAddFollowupModal()">+ Add Follow-up</button>
+      </div>`;
     if (overdueDiv) overdueDiv.style.display = "none";
     return;
   }
@@ -682,36 +728,40 @@ function renderFollowups(followups) {
   if (overdueDiv) {
     if (overdue.length > 0) {
       overdueDiv.style.display = "block";
-      overdueDiv.innerHTML = `⚠️ <strong>${overdue.length} overdue follow-up${overdue.length !== 1 ? "s" : ""}</strong> — shown in red below. Mark them done once actioned.`;
+      overdueDiv.innerHTML = `⚠️ <strong>${overdue.length} overdue follow-up${overdue.length !== 1 ? "s" : ""}</strong> — shown below in red. Mark them done once actioned.`;
     } else {
       overdueDiv.style.display = "none";
     }
   }
 
-  tbody.innerHTML = sorted.map(f => {
+  container.innerHTML = sorted.map(f => {
     const isOverdue = f.status === "Pending" && f.reminder_date < TODAY;
     const isToday = f.reminder_date === TODAY;
     const displayDate = new Date(f.reminder_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    const rowClass = isOverdue ? "prop-row fu-overdue" : isToday ? "prop-row fu-today" : "prop-row";
+    const cardClass = isOverdue ? "followup-card fu-overdue" : isToday ? "followup-card fu-today" : "followup-card";
     const dateBadge = isOverdue
-      ? `<span class="fu-date-badge overdue">${displayDate} ⚠️ Overdue</span>`
+      ? `<span class="fu-date-badge overdue">⚠️ ${displayDate} — Overdue</span>`
       : isToday
-      ? `<span class="fu-date-badge today">${displayDate} — Today</span>`
-      : `<span class="fu-date-badge">${displayDate}</span>`;
+      ? `<span class="fu-date-badge today">📅 Today</span>`
+      : `<span class="fu-date-badge">📅 ${displayDate}</span>`;
     const statusBadgeHtml = f.status === "Done"
       ? `<span class="badge badge-available">Done</span>`
       : `<span class="badge badge-reserved">Pending</span>`;
-    return `<tr class="${rowClass}">
-      <td data-label="Client"><strong>${f.client_name}</strong></td>
-      <td data-label="Note">${f.note}</td>
-      <td data-label="Date">${dateBadge}</td>
-      <td data-label="Status">${statusBadgeHtml}</td>
-      <td class="actions-cell">
-        ${f.status === "Pending" ? `<button class="btn-icon" onclick="markFollowupDone(${f.id})" title="Mark Done">✅</button>` : ""}
-        <button class="btn-icon btn-edit" onclick="openEditFollowupModal(${f.id})" title="Edit">✏️</button>
-        <button class="btn-icon btn-delete" onclick="deleteFollowup(${f.id})" title="Delete">🗑️</button>
-      </td>
-    </tr>`;
+    const waText = encodeURIComponent(`Hi, just a reminder: ${f.note}`);
+    return `
+      <div class="${cardClass}">
+        <div class="followup-card-header">
+          <span class="followup-client">👤 ${f.client_name}</span>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${dateBadge} ${statusBadgeHtml}</div>
+        </div>
+        <div class="followup-note">${f.note}</div>
+        <div class="followup-card-footer">
+          <a href="https://wa.me/?text=${waText}" target="_blank" class="btn-wa">💬 WhatsApp</a>
+          ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">✅ Mark Done</button>` : ""}
+          <button class="btn-sm-icon edit" onclick="openEditFollowupModal(${f.id})" title="Edit">✏️</button>
+          <button class="btn-sm-icon del" onclick="deleteFollowup(${f.id})" title="Delete">🗑️</button>
+        </div>
+      </div>`;
   }).join("");
 }
 

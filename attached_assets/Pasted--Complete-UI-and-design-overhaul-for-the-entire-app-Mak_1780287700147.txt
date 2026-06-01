@@ -1,0 +1,16 @@
+"Complete UI and design overhaul for the entire app. Make it look modern, professional and clean. Here are the specific changes:
+
+Overall theme — Use a clean white background with a professional blue (#1a56db) and white color scheme. Add subtle shadows and rounded corners on all cards. Use Inter or Poppins font throughout.
+Navbar — Make it cleaner with a proper logo area on the left, navigation tabs in the center, and Add Property button on the right. Active tab should have a clear blue underline indicator. Add a subtle bottom border shadow to separate navbar from content.
+Dashboard stats cards — Make them proper cards with an icon, label, and big bold number. Add a subtle colored left border for each — blue for total, green for available, red for sold, purple for rented. Hover effect on each card.
+Inventory cards (mobile) and table (desktop) — Cleaner row styling, better typography hierarchy, status badges should be pill shaped with proper colors — green for available, red for sold, blue for rented, orange for reserved.
+Settings page — Redesign as a proper two column layout on desktop. Left side has the form fields (name, phone, tagline). Right side shows a live preview card of how the WhatsApp message will look. Add a profile avatar/initials circle at the top. Make it feel like a proper settings page not a basic form.
+All forms and modals — Clean white background, proper field labels above inputs, blue focus ring on active fields, rounded corners on all inputs and buttons.
+AI Matcher section — Make it look like a proper chat interface. Input area at bottom, results showing as clean cards above.
+Follow-ups section — Overdue items in a red tinted card, today's items in orange tinted card, future items in clean white cards. Each card shows client name, note, date, and a WhatsApp direct message button.
+Buyers section — Each buyer as a clean card showing name, phone, requirement details, and a green 'Matches X properties' badge.
+Empty states — When any section has no data, show a helpful illustrated empty state with an icon, message and a call to action button instead of just blank space."
+
+
+
+This is a complete redesign prompt. Let it run — will take a few minutes. Share screenshots of every tab when done!
