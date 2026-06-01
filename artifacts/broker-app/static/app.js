@@ -173,11 +173,14 @@ function updateStats() {
   const total = allProperties.length;
   const available = allProperties.filter(p => p.status === "Available").length;
   const sold = allProperties.filter(p => p.status === "Sold").length;
-  const avgPrice = total > 0 ? allProperties.reduce((s, p) => s + p.price, 0) / total : 0;
+  const monthStr = TODAY.slice(0, 7);
+  const dealsThisMonth = allProperties.filter(p =>
+    (p.status === "Sold" || p.status === "Rented") && (p.date_added || "").startsWith(monthStr)
+  ).length;
   document.getElementById("statTotal").textContent = total;
   document.getElementById("statAvailable").textContent = available;
   document.getElementById("statSold").textContent = sold;
-  document.getElementById("statAvgPrice").textContent = total > 0 ? formatPrice(Math.round(avgPrice)) : "-";
+  document.getElementById("statDealsMonth").textContent = dealsThisMonth;
 }
 
 function statusBadge(status) {
@@ -293,7 +296,7 @@ function renderTable(props) {
       <td class="actions-cell">
         <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">↗</button>
         <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
-        <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Del</button>
+        <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
       </td>
     </tr>
     ${hasNotes ? `
@@ -336,7 +339,7 @@ function renderMobileList(props) {
           <div class="prop-mobile-actions">
             <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)">↗ Share</button>
             <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})">Edit</button>
-            <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})">Del</button>
+            <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})">Delete</button>
           </div>
         </div>
       </div>`;
@@ -614,7 +617,7 @@ function renderClients() {
           </div>
           <div class="client-card-actions">
             <button class="btn-icon btn-edit" onclick="openEditClientModal(${c.id})">Edit</button>
-            <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Del</button>
+            <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Delete</button>
           </div>
         </div>
         ${lookingForFull || budgetText || c.notes ? `
@@ -627,7 +630,7 @@ function renderClients() {
           ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>` : "<span></span>"}
           <div style="display:flex;gap:6px;">
             <button class="btn-sm-icon edit" onclick="openEditClientModal(${c.id})">Edit</button>
-            <button class="btn-sm-icon del" onclick="deleteClient(${c.id})">Del</button>
+            <button class="btn-fu-delete" onclick="deleteClient(${c.id})">Delete</button>
           </div>
         </div>
       </div>`;
@@ -801,7 +804,11 @@ function renderFollowups(followups) {
     const isOverdue = f.status === "Pending" && f.reminder_date < TODAY;
     const isToday = f.reminder_date === TODAY;
     const displayDate = new Date(f.reminder_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-    const cardClass = isOverdue ? "followup-card fu-overdue" : isToday ? "followup-card fu-today" : "followup-card";
+    const isDone = f.status === "Done";
+    const cardClass = isOverdue ? "followup-card fu-overdue"
+      : isToday ? "followup-card fu-today"
+      : isDone ? "followup-card fu-done"
+      : "followup-card fu-future";
     const dateBadge = isOverdue
       ? `<span class="fu-date-badge overdue">${displayDate} — Overdue</span>`
       : isToday
@@ -821,8 +828,8 @@ function renderFollowups(followups) {
         <div class="followup-card-footer">
           <a href="https://wa.me/?text=${waText}" target="_blank" class="btn-wa">WhatsApp</a>
           ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">Mark Done</button>` : ""}
-          <button class="btn-sm-icon edit" onclick="openEditFollowupModal(${f.id})" title="Edit">Edit</button>
-          <button class="btn-sm-icon del" onclick="deleteFollowup(${f.id})" title="Delete">Del</button>
+          <button class="btn-fu-edit" onclick="openEditFollowupModal(${f.id})">Edit</button>
+          <button class="btn-fu-delete" onclick="deleteFollowup(${f.id})">Delete</button>
         </div>
       </div>`;
   }).join("");

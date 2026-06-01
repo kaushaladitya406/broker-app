@@ -23,7 +23,6 @@
       <button class="topnav-item" id="nav-settings" onclick="showTab('settings')">Settings</button>
     </div>
     <div class="topnav-right">
-      <button class="btn-primary" onclick="openAddModal()">+ Add Property</button>
       <a href="/logout" class="topnav-logout">Sign out</a>
     </div>
   </nav>
@@ -31,7 +30,6 @@
   <!-- Mobile header -->
   <header class="mobile-header">
     <span class="mobile-header-brand">BrokerApp</span>
-    <button class="btn-primary" onclick="openAddModal()" style="padding:5px 12px;font-size:13px;">+ Add</button>
   </header>
 
   <main>
@@ -41,7 +39,6 @@
 
       <div class="page-header">
         <div class="page-title">Dashboard</div>
-        <button class="btn-primary" onclick="openAddModal()">+ Add Property</button>
       </div>
 
       <div class="stats-grid">
@@ -58,21 +55,21 @@
           <div class="stat-label">Sold</div>
         </div>
         <div class="stat-card stat-card-purple">
-          <div class="stat-value" id="statAvgPrice">—</div>
-          <div class="stat-label">Avg Price</div>
+          <div class="stat-value" id="statDealsMonth">—</div>
+          <div class="stat-label">Deals This Month</div>
         </div>
       </div>
 
       <div class="summary-row">
-        <div class="summary-card" onclick="showTab('clients')">
+        <div class="summary-card summary-card-blue" onclick="showTab('clients')">
           <div class="summary-card-value" id="dashClientsTotal">—</div>
           <div class="summary-card-label">Total Clients</div>
         </div>
-        <div class="summary-card" onclick="showTab('clients')">
+        <div class="summary-card summary-card-green" onclick="showTab('clients')">
           <div class="summary-card-value" id="dashClientsActive">—</div>
           <div class="summary-card-label">Active Clients</div>
         </div>
-        <div class="summary-card" onclick="showTab('followups')">
+        <div class="summary-card summary-card-orange" onclick="showTab('followups')">
           <div class="summary-card-value" id="dashFollowupsCount">—</div>
           <div class="summary-card-label">Pending Follow-ups</div>
         </div>
@@ -119,19 +116,19 @@ or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
       <div class="section">
         <div class="section-header">
           <div class="section-title">Properties</div>
-          <div class="filters-row">
-            <input type="text" id="searchInput" class="search-input" placeholder="Search location or type..." />
-            <select id="typeFilter" class="filter-select">
-              <option value="">All Types</option>
-              <option>Apartment</option><option>House</option><option>Villa</option>
-              <option>Office</option><option>Shop</option><option>Land</option><option>Warehouse</option>
-            </select>
-            <select id="statusFilter" class="filter-select">
-              <option value="">All Status</option>
-              <option>Available</option><option>Reserved</option><option>Sold</option><option>Rented</option>
-            </select>
-            <button class="btn-primary" onclick="openAddModal()">+ Add</button>
-          </div>
+          <button class="btn-primary" onclick="openAddModal()">+ Add</button>
+        </div>
+        <div class="inventory-filters">
+          <input type="text" id="searchInput" class="search-input" placeholder="Search location or type..." />
+          <select id="typeFilter" class="filter-select">
+            <option value="">All Types</option>
+            <option>Apartment</option><option>House</option><option>Villa</option>
+            <option>Office</option><option>Shop</option><option>Land</option><option>Warehouse</option>
+          </select>
+          <select id="statusFilter" class="filter-select">
+            <option value="">All Status</option>
+            <option>Available</option><option>Reserved</option><option>Sold</option><option>Rented</option>
+          </select>
         </div>
         <div id="propMobileList" class="prop-mobile-list"></div>
         <div class="table-wrap">
@@ -149,24 +146,16 @@ or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
         <div class="page-title">AI Matcher</div>
       </div>
       <div class="section">
-        <div class="chat-wrapper">
-          <div class="chat-header">
-            <h2>Match properties to a client message</h2>
-            <p>Paste a WhatsApp message — AI returns matching properties from your inventory</p>
-          </div>
-          <div class="chat-body">
-            <div id="matchResult">
-              <div class="chat-start-hint">
-                <div>Paste a client's message below and click <strong>Find Matches</strong>.</div>
-              </div>
-            </div>
-          </div>
-          <div class="chat-input-area">
-            <textarea id="whatsappMsg" placeholder="Paste a client's WhatsApp message here...
-Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available ho'"></textarea>
-            <button class="match-btn" id="matchBtn" onclick="matchProperties()">Find Matches</button>
-          </div>
+        <div class="chat-header">
+          <h2>Match properties to a client message</h2>
+          <p>Paste a WhatsApp message — AI returns matching properties from your inventory</p>
         </div>
+        <div class="chat-input-area">
+          <textarea id="whatsappMsg" placeholder="Paste a client's WhatsApp message here...
+Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available ho'"></textarea>
+          <button class="match-btn" id="matchBtn" onclick="matchProperties()">Find Matches</button>
+        </div>
+        <div id="matchResult"></div>
       </div>
     </div>
 
@@ -176,7 +165,7 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <div class="page-title">Clients</div>
         <button class="btn-primary" onclick="openAddClientModal()">+ Add Client</button>
       </div>
-      <div class="stats-grid" style="margin-bottom:16px">
+      <div class="stats-grid stats-grid-3" style="margin-bottom:16px">
         <div class="stat-card stat-card-green">
           <div class="stat-value" id="clientStatActive">—</div>
           <div class="stat-label">Active</div>
@@ -185,7 +174,7 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
           <div class="stat-value" id="clientStatInquiry">—</div>
           <div class="stat-label">Inquiry</div>
         </div>
-        <div class="stat-card stat-card-purple">
+        <div class="stat-card stat-card-gray">
           <div class="stat-value" id="clientStatClosed">—</div>
           <div class="stat-label">Closed</div>
         </div>
@@ -254,9 +243,6 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
                 <button type="submit" class="btn-primary" id="saveSettingsBtn">Save</button>
                 <span class="settings-saved" id="settingsSaved" style="display:none">Saved</span>
               </div>
-              <div style="margin-top:24px;padding-top:18px;border-top:1px solid var(--border);">
-                <a href="/logout" class="btn-cancel" style="display:inline-flex;align-items:center;text-decoration:none;">Sign out</a>
-              </div>
             </form>
           </div>
           <div class="settings-right">
@@ -268,6 +254,9 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
             </div>
           </div>
         </div>
+      </div>
+      <div class="settings-signout-area">
+        <a href="/logout" class="settings-signout-btn">Sign out</a>
       </div>
     </div>
 
