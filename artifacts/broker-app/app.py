@@ -174,6 +174,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS followups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_name TEXT NOT NULL,
+            phone TEXT,
             note TEXT NOT NULL,
             reminder_date TEXT NOT NULL,
             status TEXT NOT NULL DEFAULT 'Pending',
@@ -191,7 +192,7 @@ def init_db():
             budget_max REAL DEFAULT 0,
             configuration TEXT DEFAULT '',
             notes TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'Inquiry',
+            status TEXT NOT NULL DEFAULT 'New Lead',
             date_added TEXT NOT NULL DEFAULT (date('now')),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
@@ -204,7 +205,7 @@ def init_db():
             for b in db.execute("SELECT * FROM buyers").fetchall():
                 db.execute(
                     "INSERT INTO clients (name, phone, property_type, location, budget_min, budget_max, notes, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')",
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, 'Looking')",
                     (b["name"], b["phone"] or "", b["property_type"] or "",
                      b["location"] or "", float(b["budget_min"] or 0),
                      float(b["budget_max"] or 0), b["notes"] or "")
@@ -213,7 +214,7 @@ def init_db():
         if inq_exist:
             for inq in db.execute("SELECT * FROM inquiries").fetchall():
                 db.execute(
-                    "INSERT INTO clients (name, notes, status) VALUES (?, ?, 'Inquiry')",
+                    "INSERT INTO clients (name, notes, status) VALUES (?, ?, 'New Lead')",
                     (inq["client_name"], inq["notes"] or "")
                 )
         db.execute(
@@ -229,6 +230,29 @@ def init_db():
             "INSERT INTO settings (key, value) VALUES ('client_status_v2', '1') "
             "ON CONFLICT(key) DO UPDATE SET value='1'"
         )
+
+    # One-time migration: rename client statuses to broker-friendly labels
+    status_v3 = db.execute("SELECT value FROM settings WHERE key='client_status_v3'").fetchone()
+    if not status_v3:
+        rename = {
+            "Active": "Looking",
+            "Inquiry": "New Lead",
+            "Deal In Progress": "Negotiating",
+            "Closed Won": "Deal Done",
+            "Closed Lost": "Not Interested",
+        }
+        for old, new in rename.items():
+            db.execute("UPDATE clients SET status=? WHERE status=?", (new, old))
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES ('client_status_v3', '1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
+
+    # Add phone column to followups for existing databases
+    fu_cols = [r["name"] for r in db.execute("PRAGMA table_info(followups)").fetchall()]
+    if "phone" not in fu_cols:
+        db.execute("ALTER TABLE followups ADD COLUMN phone TEXT")
+
     db.commit()
     db.close()
 
@@ -280,7 +304,7 @@ def index():
 # ─── Properties ─────────────────────────────────────────────────────────────
 
 def find_matching_buyers(db, prop):
-    buyers = [dict(r) for r in db.execute("SELECT * FROM clients WHERE status='Active' ORDER BY created_at DESC").fetchall()]
+    buyers = [dict(r) for r in db.execute("SELECT * FROM clients WHERE status='Looking' ORDER BY created_at DESC").fetchall()]
     matches = []
     for b in buyers:
         if b["property_type"] and b["property_type"] != prop["property_type"]:
@@ -410,7 +434,7 @@ def update_property_status(prop_id):
         crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
         if not crow:
             return jsonify({"error": "Linked client not found"}), 404
-        db.execute("UPDATE clients SET status='Closed Won' WHERE id=?", (link_client_id,))
+        db.execute("UPDATE clients SET status='Deal Done' WHERE id=?", (link_client_id,))
         crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
         linked_client = dict(crow) if crow else None
 
@@ -571,7 +595,7 @@ def add_client():
         (data["name"], data.get("phone", ""), data.get("property_type", ""),
          data.get("location", ""), float(data.get("budget_min") or 0),
          float(data.get("budget_max") or 0), data.get("configuration", ""),
-         data.get("notes", ""), data.get("status", "Inquiry"))
+         data.get("notes", ""), data.get("status", "New Lead"))
     )
     db.commit()
     row = db.execute("SELECT * FROM clients WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -623,8 +647,8 @@ def add_followup():
         return jsonify({"error": "client_name, note, and reminder_date are required"}), 400
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO followups (client_name, note, reminder_date, status) VALUES (?, ?, ?, ?)",
-        (data["client_name"], data["note"], data["reminder_date"], data.get("status", "Pending"))
+        "INSERT INTO followups (client_name, phone, note, reminder_date, status) VALUES (?, ?, ?, ?, ?)",
+        (data["client_name"], data.get("phone", ""), data["note"], data["reminder_date"], data.get("status", "Pending"))
     )
     db.commit()
     row = db.execute("SELECT * FROM followups WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -646,8 +670,8 @@ def update_followup(fu_id):
     data = request.get_json()
     db = get_db()
     db.execute(
-        "UPDATE followups SET client_name=?, note=?, reminder_date=?, status=? WHERE id=?",
-        (data["client_name"], data["note"], data["reminder_date"], data["status"], fu_id)
+        "UPDATE followups SET client_name=?, phone=?, note=?, reminder_date=?, status=? WHERE id=?",
+        (data["client_name"], data.get("phone", ""), data["note"], data["reminder_date"], data["status"], fu_id)
     )
     db.commit()
     row = db.execute("SELECT * FROM followups WHERE id = ?", (fu_id,)).fetchone()

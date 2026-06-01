@@ -67,7 +67,7 @@
         </div>
         <div class="summary-card summary-card-green" onclick="showTab('clients')">
           <div class="summary-card-value" id="dashClientsActive">—</div>
-          <div class="summary-card-label">Active Clients</div>
+          <div class="summary-card-label">Looking Clients</div>
         </div>
         <div class="summary-card summary-card-orange" onclick="showTab('followups')">
           <div class="summary-card-value" id="dashFollowupsCount">—</div>
@@ -162,11 +162,11 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
       <div class="stats-grid stats-grid-3" style="margin-bottom:16px">
         <div class="stat-card stat-card-green">
           <div class="stat-value" id="clientStatActive">—</div>
-          <div class="stat-label">Active</div>
+          <div class="stat-label">Looking</div>
         </div>
         <div class="stat-card stat-card-blue">
           <div class="stat-value" id="clientStatInquiry">—</div>
-          <div class="stat-label">Inquiry</div>
+          <div class="stat-label">New Lead</div>
         </div>
         <div class="stat-card stat-card-gray">
           <div class="stat-value" id="clientStatClosed">—</div>
@@ -178,11 +178,11 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
           <div class="section-title">All Clients</div>
           <div class="filter-pills" id="clientFilterPills">
             <button class="filter-pill active" onclick="setClientFilter(this, '')">All</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Active')">Active</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Inquiry')">Inquiry</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Deal In Progress')">Deal In Progress</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Closed Won')">Closed Won</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Closed Lost')">Closed Lost</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Looking')">Looking</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'New Lead')">New Lead</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Negotiating')">Negotiating</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Deal Done')">Deal Done</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Not Interested')">Not Interested</button>
           </div>
         </div>
         <div class="clients-list" id="clientsList">
@@ -474,11 +474,11 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <div class="form-group">
           <label>Status</label>
           <select id="clientStatus">
-            <option value="Active">Active — serious buyer, auto-matched to inventory</option>
-            <option value="Inquiry" selected>Inquiry — asked about a property</option>
-            <option value="Deal In Progress">Deal In Progress — negotiating / closing</option>
-            <option value="Closed Won">Closed Won — deal completed</option>
-            <option value="Closed Lost">Closed Lost — deal dropped</option>
+            <option value="Looking">Looking — serious buyer, auto-matched to inventory</option>
+            <option value="New Lead" selected>New Lead — asked about a property</option>
+            <option value="Negotiating">Negotiating — negotiating / closing</option>
+            <option value="Deal Done">Deal Done — deal completed</option>
+            <option value="Not Interested">Not Interested — deal dropped</option>
           </select>
         </div>
         <div class="form-group">
@@ -506,6 +506,10 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <div class="form-group">
           <label>Client Name</label>
           <input type="text" id="fuClientName" placeholder="e.g. Gurpreet Kaur" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" id="fuPhone" placeholder="e.g. 98765 43210" />
         </div>
         <div class="form-group">
           <label>Note</label>
@@ -562,12 +566,12 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
     <div class="modal-body">
       <p class="link-client-msg" id="linkClientMsg"></p>
       <div class="form-group">
-        <label>Client (Active / Deal In Progress)</label>
+        <label>Client (Looking / Negotiating)</label>
         <select id="linkClientSelect">
           <option value="">— Don't link —</option>
         </select>
       </div>
-      <p class="link-client-hint">Linking marks the property closed and sets the client to <strong>Closed Won</strong>.</p>
+      <p class="link-client-hint">Linking marks the property closed and sets the client to <strong>Deal Done</strong>.</p>
     </div>
     <div class="modal-footer">
       <button type="button" class="btn-cancel" onclick="confirmLinkClient(true)">Skip</button>

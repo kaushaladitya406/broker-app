@@ -543,13 +543,13 @@ async function applyStatusChange(propId, status, linkClientId) {
   await fetchClients();
   if (typeof renderDashboard === "function") renderDashboard();
   if (data.linked_client) {
-    alert(`Marked as ${status}. ${data.linked_client.name} is now Closed Won.`);
+    alert(`Marked as ${status}. ${data.linked_client.name} is now Deal Done.`);
   }
 }
 
 function openLinkClientModal(status) {
   const select = document.getElementById("linkClientSelect");
-  const eligible = allClients.filter(c => c.status === "Active" || c.status === "Deal In Progress");
+  const eligible = allClients.filter(c => c.status === "Looking" || c.status === "Negotiating");
   document.getElementById("linkClientMsg").textContent =
     `You're marking this property as ${status}. Link it to a client to record the deal?`;
   select.innerHTML = `<option value="">— Don't link —</option>` +
@@ -646,7 +646,7 @@ async function matchProperties() {
           ${p.notes ? `<div class="match-card-notes">${p.notes}</div>` : ""}
         </div>
       `).join("") + `</div>`;
-      html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">Save as Inquiry</button>`;
+      html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">Save as New Lead</button>`;
     }
     resultDiv.innerHTML = html;
     const st = document.getElementById("matchSummaryText");
@@ -674,7 +674,7 @@ async function saveInquiry(e) {
     name: document.getElementById("inqClientName").value.trim(),
     phone: document.getElementById("inqClientPhone").value.trim(),
     notes: document.getElementById("inqNotes").value.trim(),
-    status: "Inquiry",
+    status: "New Lead",
   };
   if (!payload.name) return;
   const btn = document.getElementById("saveInquiryBtn");
@@ -699,9 +699,9 @@ async function fetchClients() {
 
 function updateClientStats() {
   const el = id => document.getElementById(id);
-  if (el("clientStatActive")) el("clientStatActive").textContent = allClients.filter(c => c.status === "Active").length;
-  if (el("clientStatInquiry")) el("clientStatInquiry").textContent = allClients.filter(c => c.status === "Inquiry").length;
-  if (el("clientStatClosed")) el("clientStatClosed").textContent = allClients.filter(c => c.status === "Closed Won" || c.status === "Closed Lost").length;
+  if (el("clientStatActive")) el("clientStatActive").textContent = allClients.filter(c => c.status === "Looking").length;
+  if (el("clientStatInquiry")) el("clientStatInquiry").textContent = allClients.filter(c => c.status === "New Lead").length;
+  if (el("clientStatClosed")) el("clientStatClosed").textContent = allClients.filter(c => c.status === "Deal Done" || c.status === "Not Interested").length;
 }
 
 function setClientFilter(btn, filter) {
@@ -712,7 +712,7 @@ function setClientFilter(btn, filter) {
 }
 
 function getClientMatches(c) {
-  if (c.status !== "Active") return [];
+  if (c.status !== "Looking") return [];
   return allProperties.filter(p => {
     if (p.status !== "Available") return false;
     if (c.property_type && p.property_type !== c.property_type) return false;
@@ -726,11 +726,11 @@ function getClientMatches(c) {
 
 function clientStatusBadge(status) {
   const map = {
-    Active: "badge-client-active",
-    Inquiry: "badge-client-inquiry",
-    "Deal In Progress": "badge-client-progress",
-    "Closed Won": "badge-client-won",
-    "Closed Lost": "badge-client-lost",
+    Looking: "badge-client-active",
+    "New Lead": "badge-client-inquiry",
+    Negotiating: "badge-client-progress",
+    "Deal Done": "badge-client-won",
+    "Not Interested": "badge-client-lost",
   };
   return `<span class="badge ${map[status] || "badge-client-inquiry"}">${status}</span>`;
 }
@@ -746,7 +746,7 @@ function renderClients() {
   }
   list.innerHTML = filtered.map(c => {
     const matches = getClientMatches(c);
-    const matchBadge = c.status === "Active"
+    const matchBadge = c.status === "Looking"
       ? (matches.length > 0
           ? `<button class="client-match-badge" onclick="event.stopPropagation(); showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
           : `<span class="client-no-match">No matches</span>`)
@@ -819,7 +819,7 @@ function openAddClientModal() {
   editingClientId = null;
   document.getElementById("clientModalTitle").textContent = "Add Client";
   document.getElementById("clientForm").reset();
-  document.getElementById("clientStatus").value = "Inquiry";
+  document.getElementById("clientStatus").value = "New Lead";
   document.getElementById("clientBudgetMinConv").textContent = "";
   document.getElementById("clientBudgetMaxConv").textContent = "";
   document.getElementById("addClientModal").classList.add("open");
@@ -921,7 +921,7 @@ function renderDashboard() {
   const activeEl = document.getElementById("dashClientsActive");
   const followupsEl = document.getElementById("dashFollowupsCount");
   if (totalEl) totalEl.textContent = allClients.length;
-  if (activeEl) activeEl.textContent = allClients.filter(c => c.status === "Active").length;
+  if (activeEl) activeEl.textContent = allClients.filter(c => c.status === "Looking").length;
   if (followupsEl) {
     const pending = allFollowups.filter(f => f.status === "Pending" && f.reminder_date <= TODAY).length;
     followupsEl.textContent = pending;
@@ -993,21 +993,36 @@ function renderFollowups(followups) {
       ? `<span class="badge badge-available">Done</span>`
       : `<span class="badge badge-reserved">Pending</span>`;
     const waText = encodeURIComponent(`Hi, just a reminder: ${f.note}`);
+    const phoneDigits = (f.phone || "").replace(/\D/g, "");
+    const waHref = phoneDigits ? `https://wa.me/${phoneDigits}?text=${waText}` : `https://wa.me/?text=${waText}`;
     return `
-      <div class="${cardClass}">
-        <div class="followup-card-header">
-          <span class="followup-client">${f.client_name}</span>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${dateBadge} ${statusBadgeHtml}</div>
+      <div class="${cardClass}" id="followup-card-${f.id}">
+        <div class="followup-summary" role="button" tabindex="0" aria-expanded="false" aria-controls="followup-detail-${f.id}" onclick="toggleFollowupCard(${f.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleFollowupCard(${f.id});}">
+          <div class="followup-ident">
+            <span class="followup-client">${f.client_name}</span>
+            ${f.phone ? `<a href="tel:${f.phone}" class="followup-phone" onclick="event.stopPropagation()">${f.phone}</a>` : ""}
+          </div>
+          <div class="followup-summary-meta">${dateBadge} ${statusBadgeHtml}</div>
         </div>
-        <div class="followup-note">${f.note}</div>
-        <div class="followup-card-footer">
-          <a href="https://wa.me/?text=${waText}" target="_blank" class="btn-wa">WhatsApp</a>
-          ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">Mark Done</button>` : ""}
-          <button class="btn-fu-edit" onclick="openEditFollowupModal(${f.id})">Edit</button>
-          <button class="btn-fu-delete" onclick="deleteFollowup(${f.id})">Delete</button>
+        <div class="followup-detail" id="followup-detail-${f.id}">
+          <div class="followup-note">${f.note}</div>
+          <div class="followup-card-footer">
+            <a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>
+            ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">Mark Done</button>` : ""}
+            <button class="btn-fu-edit" onclick="openEditFollowupModal(${f.id})">Edit</button>
+            <button class="btn-fu-delete" onclick="deleteFollowup(${f.id})">Delete</button>
+          </div>
         </div>
       </div>`;
   }).join("");
+}
+
+function toggleFollowupCard(id) {
+  const card = document.getElementById(`followup-card-${id}`);
+  if (!card) return;
+  const expanded = card.classList.toggle("expanded");
+  const summary = card.querySelector(".followup-summary");
+  if (summary) summary.setAttribute("aria-expanded", expanded ? "true" : "false");
 }
 
 function openAddFollowupModal() {
@@ -1024,6 +1039,7 @@ function openEditFollowupModal(id) {
   editingFollowupId = id;
   document.getElementById("followupModalTitle").textContent = "Edit Follow-up";
   document.getElementById("fuClientName").value = f.client_name;
+  document.getElementById("fuPhone").value = f.phone || "";
   document.getElementById("fuNote").value = f.note;
   document.getElementById("fuDate").value = f.reminder_date;
   document.getElementById("fuStatus").value = f.status;
@@ -1036,6 +1052,7 @@ async function saveFollowup(e) {
   e.preventDefault();
   const payload = {
     client_name: document.getElementById("fuClientName").value.trim(),
+    phone: document.getElementById("fuPhone").value.trim(),
     note: document.getElementById("fuNote").value.trim(),
     reminder_date: document.getElementById("fuDate").value,
     status: document.getElementById("fuStatus").value,

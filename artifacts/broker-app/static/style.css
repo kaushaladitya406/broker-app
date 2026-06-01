@@ -157,7 +157,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
   gap: 12px;
 }
 .page-title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text);
   letter-spacing: -0.5px;
@@ -706,7 +706,7 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 14px 16px;
+  overflow: hidden;
   transition: box-shadow 0.12s;
 }
 .followup-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
@@ -714,6 +714,17 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
 .followup-card.fu-today { background: var(--warning-light); border-color: #f5d796; border-left: 3px solid var(--orange); }
 .followup-card.fu-done { border-left: 3px solid var(--success); }
 .followup-card.fu-future { border-left: 3px solid var(--border); }
+.followup-summary {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 12px 16px; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.followup-ident { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.followup-phone { font-size: 12px; color: var(--primary); text-decoration: none; align-self: flex-start; }
+.followup-phone:hover { text-decoration: underline; }
+.followup-summary-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex-shrink: 0; }
+.followup-detail { display: none; padding: 0 16px 12px; }
+.followup-card.expanded .followup-detail { display: block; }
 .followup-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; flex-wrap: wrap; }
 .followup-client { font-size: 14px; font-weight: 600; color: var(--text); }
 .followup-note { font-size: 14px; color: var(--text-2); margin-bottom: 10px; line-height: 1.5; }
