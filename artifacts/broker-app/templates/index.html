@@ -127,7 +127,8 @@ or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
           </select>
           <select id="statusFilter" class="filter-select">
             <option value="">All Status</option>
-            <option>Available</option><option>Reserved</option><option>Sold</option><option>Rented</option>
+            <option>Available</option><option>Reserved</option><option>Under Negotiation</option>
+            <option>Sold</option><option>Rented</option><option>Withdrawn</option>
           </select>
         </div>
         <div id="propMobileList" class="prop-mobile-list"></div>
@@ -186,7 +187,9 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
             <button class="filter-pill active" onclick="setClientFilter(this, '')">All</button>
             <button class="filter-pill" onclick="setClientFilter(this, 'Active')">Active</button>
             <button class="filter-pill" onclick="setClientFilter(this, 'Inquiry')">Inquiry</button>
-            <button class="filter-pill" onclick="setClientFilter(this, 'Closed')">Closed</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Deal In Progress')">Deal In Progress</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Closed Won')">Closed Won</button>
+            <button class="filter-pill" onclick="setClientFilter(this, 'Closed Lost')">Closed Lost</button>
           </div>
         </div>
         <div class="clients-list" id="clientsList">
@@ -337,8 +340,10 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
             <select id="propStatus" required>
               <option value="Available">Available</option>
               <option value="Reserved">Reserved</option>
+              <option value="Under Negotiation">Under Negotiation</option>
               <option value="Sold">Sold</option>
               <option value="Rented">Rented</option>
+              <option value="Withdrawn">Withdrawn</option>
             </select>
           </div>
         </div>
@@ -475,7 +480,9 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
           <select id="clientStatus">
             <option value="Active">Active — serious buyer, auto-matched to inventory</option>
             <option value="Inquiry" selected>Inquiry — asked about a property</option>
-            <option value="Closed">Closed — deal done or dropped</option>
+            <option value="Deal In Progress">Deal In Progress — negotiating / closing</option>
+            <option value="Closed Won">Closed Won — deal completed</option>
+            <option value="Closed Lost">Closed Lost — deal dropped</option>
           </select>
         </div>
         <div class="form-group">
@@ -527,6 +534,49 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
         <button type="submit" class="btn-primary" id="saveFollowupBtn">Save</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- ─── QUICK STATUS MODAL ─────────── -->
+<div class="modal-overlay" id="quickStatusModal">
+  <div class="modal modal-narrow">
+    <div class="modal-header">
+      <h3>Change Status</h3>
+      <button class="modal-close" onclick="closeQuickStatusModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="quick-status-prop" id="quickStatusProp"></div>
+      <div class="quick-status-actions">
+        <button class="quick-status-btn qs-reserved" onclick="quickSetStatus('Reserved')">Mark as Reserved</button>
+        <button class="quick-status-btn qs-sold" onclick="quickSetStatus('Sold')">Mark as Sold</button>
+        <button class="quick-status-btn qs-rented" onclick="quickSetStatus('Rented')">Mark as Rented</button>
+        <button class="quick-status-btn qs-withdrawn" onclick="quickSetStatus('Withdrawn')">Mark as Withdrawn</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── LINK CLIENT MODAL ─────────── -->
+<div class="modal-overlay" id="linkClientModal">
+  <div class="modal modal-narrow">
+    <div class="modal-header">
+      <h3>Link this to a client?</h3>
+      <button class="modal-close" onclick="closeLinkClientModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <p class="link-client-msg" id="linkClientMsg"></p>
+      <div class="form-group">
+        <label>Client (Active / Deal In Progress)</label>
+        <select id="linkClientSelect">
+          <option value="">— Don't link —</option>
+        </select>
+      </div>
+      <p class="link-client-hint">Linking marks the property closed and sets the client to <strong>Closed Won</strong>.</p>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" onclick="confirmLinkClient(true)">Skip</button>
+      <button type="button" class="btn-primary" id="linkClientConfirmBtn" onclick="confirmLinkClient(false)">Confirm</button>
+    </div>
   </div>
 </div>
 

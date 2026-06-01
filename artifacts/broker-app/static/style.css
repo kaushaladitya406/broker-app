@@ -240,9 +240,10 @@ main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
 .filters-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inventory-filters {
   display: flex; gap: 8px; padding: 10px 18px;
-  border-bottom: 1px solid var(--border); align-items: center;
+  border-bottom: 1px solid var(--border); align-items: center; flex-wrap: wrap;
 }
-.inventory-filters .search-input { flex: 1; min-width: 0; }
+.inventory-filters .search-input { flex: 1 1 200px; min-width: 150px; }
+.inventory-filters .filter-select { flex: 1 1 130px; min-width: 110px; }
 .stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 
 /* ─── Form controls ─────────────────────────────────────────────────── */
@@ -317,9 +318,11 @@ td {
   border-radius: 4px;
 }
 .badge-available { background: var(--success-light); color: var(--success); }
-.badge-reserved { background: var(--warning-light); color: var(--warning); }
+.badge-reserved { background: var(--orange-light); color: var(--orange); }
+.badge-negotiation { background: var(--primary-light); color: var(--primary); }
 .badge-sold { background: var(--danger-light); color: var(--danger); }
 .badge-rented { background: var(--purple-light); color: var(--purple); }
+.badge-withdrawn { background: var(--soft); color: var(--text-3); border: 1px solid var(--border); }
 .badge-inq-new { background: var(--primary-light); color: var(--primary); }
 .badge-inq-progress { background: var(--warning-light); color: var(--warning); }
 .badge-inq-closed { background: var(--success-light); color: var(--success); }
@@ -415,6 +418,9 @@ td {
 /* Client status badges */
 .badge-client-active { background: #dcfce7; color: #15803d; }
 .badge-client-inquiry { background: #dbeafe; color: #1d4ed8; }
+.badge-client-progress { background: var(--orange-light); color: var(--orange); }
+.badge-client-won { background: #d1fae5; color: #065f46; }
+.badge-client-lost { background: var(--soft); color: var(--text-3); border: 1px solid var(--border); }
 .badge-client-closed { background: var(--soft); color: var(--text-3); border: 1px solid var(--border); }
 /* Match badge on client cards */
 .client-match-badge {
@@ -498,6 +504,7 @@ td {
 .btn-icon:hover { background: var(--soft); color: var(--text); }
 .btn-edit:hover { color: var(--primary); }
 .btn-delete:hover { color: var(--danger); background: var(--danger-light); }
+.btn-status:hover { color: var(--warning); background: var(--orange-light); }
 .inq-meta { font-size: 12px; color: var(--text-3); }
 .inq-notes { font-size: 12px; color: var(--text-2); margin-top: 2px; }
 
@@ -795,6 +802,32 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   border: 1px solid var(--border);
 }
 .modal-wide { max-width: 540px; }
+.modal-narrow { max-width: 380px; }
+
+/* Quick status modal */
+.quick-status-prop {
+  background: var(--soft); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px; margin-bottom: 16px;
+}
+.qs-prop-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.qs-prop-sub { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+.qs-prop-current { font-size: 12px; color: var(--text-3); margin-top: 8px; }
+.quick-status-actions { display: flex; flex-direction: column; gap: 8px; }
+.quick-status-btn {
+  width: 100%; text-align: left; padding: 12px 14px;
+  border-radius: var(--radius); border: 1px solid var(--border);
+  background: var(--bg); font-size: 14px; font-weight: 500; color: var(--text);
+  cursor: pointer; font-family: inherit; transition: all 0.12s;
+}
+.quick-status-btn:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.qs-reserved:hover { border-color: var(--orange); color: var(--orange); background: var(--orange-light); }
+.qs-sold:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-light); }
+.qs-rented:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-light); }
+.qs-withdrawn:hover { border-color: var(--text-3); color: var(--text-3); background: var(--soft); }
+
+/* Link client modal */
+.link-client-msg { font-size: 13.5px; color: var(--text-2); margin: 0 0 14px; line-height: 1.5; }
+.link-client-hint { font-size: 12px; color: var(--text-3); margin: 10px 0 0; line-height: 1.4; }
 @keyframes fadeUp {
   from { transform: translateY(12px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }

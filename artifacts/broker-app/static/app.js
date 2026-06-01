@@ -175,7 +175,7 @@ function updateStats() {
   const sold = allProperties.filter(p => p.status === "Sold").length;
   const monthStr = TODAY.slice(0, 7);
   const dealsThisMonth = allProperties.filter(p =>
-    (p.status === "Sold" || p.status === "Rented") && (p.date_added || "").startsWith(monthStr)
+    (p.status === "Sold" || p.status === "Rented") && (p.closed_at || "").startsWith(monthStr)
   ).length;
   document.getElementById("statTotal").textContent = total;
   document.getElementById("statAvailable").textContent = available;
@@ -184,7 +184,14 @@ function updateStats() {
 }
 
 function statusBadge(status) {
-  const map = { Available: "badge-available", Reserved: "badge-reserved", Sold: "badge-sold", Rented: "badge-rented" };
+  const map = {
+    Available: "badge-available",
+    Reserved: "badge-reserved",
+    "Under Negotiation": "badge-negotiation",
+    Sold: "badge-sold",
+    Rented: "badge-rented",
+    Withdrawn: "badge-withdrawn",
+  };
   return `<span class="badge ${map[status] || "badge-available"}">${status}</span>`;
 }
 
@@ -196,7 +203,7 @@ function configTag(config) {
 
 function buildShareText(p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
-  const statusEmoji = { Available: "✅", Reserved: "🔒", Sold: "❌", Rented: "🔑" };
+  const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
   const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
     ? `${roundArea(p.area_value)} ${p.area_unit} (${roundArea(p.size)} Sq Ft)`
     : `${roundArea(p.size || p.area_value)} Sq Ft`;
@@ -295,6 +302,7 @@ function renderTable(props) {
       <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
         <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">↗</button>
+        <button class="btn-icon btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
         <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
         <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
       </td>
@@ -338,6 +346,7 @@ function renderMobileList(props) {
           ${hasNotes ? `<div class="prop-mobile-notes">📝 ${p.notes}</div>` : ""}
           <div class="prop-mobile-actions">
             <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)">↗ Share</button>
+            <button class="btn-icon btn-status" onclick="openQuickStatusModal(${p.id})">Status</button>
             <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})">Edit</button>
             <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})">Delete</button>
           </div>
@@ -434,6 +443,81 @@ async function deleteProperty(id) {
   if (!confirm("Delete this property?")) return;
   await apiFetch(`${API}/api/properties/${id}`, { method: "DELETE" });
   await fetchProperties();
+}
+
+// ─── Quick status change ──────────────────────────────────────────────────────
+
+let quickStatusPropId = null;
+let pendingStatusChange = null; // { propId, status } awaiting client link
+
+function openQuickStatusModal(id) {
+  const p = allProperties.find(x => x.id === id);
+  if (!p) return;
+  quickStatusPropId = id;
+  document.getElementById("quickStatusProp").innerHTML =
+    `<div class="qs-prop-title">${p.configuration} ${p.property_type}</div>
+     <div class="qs-prop-sub">${p.location} · ${formatPrice(p.price)}</div>
+     <div class="qs-prop-current">Current: ${statusBadge(p.status)}</div>`;
+  document.getElementById("quickStatusModal").classList.add("open");
+}
+
+function closeQuickStatusModal() {
+  document.getElementById("quickStatusModal").classList.remove("open");
+  quickStatusPropId = null;
+}
+
+async function quickSetStatus(status) {
+  const id = quickStatusPropId;
+  if (!id) return;
+  if (status === "Sold" || status === "Rented") {
+    // Ask whether to link a client before committing
+    pendingStatusChange = { propId: id, status };
+    closeQuickStatusModal();
+    openLinkClientModal(status);
+    return;
+  }
+  closeQuickStatusModal();
+  await applyStatusChange(id, status, null);
+}
+
+async function applyStatusChange(propId, status, linkClientId) {
+  const res = await apiFetch(`${API}/api/properties/${propId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status, link_client_id: linkClientId || null }),
+  });
+  if (!res) return;
+  const data = await res.json();
+  await fetchProperties();
+  await fetchClients();
+  if (typeof renderDashboard === "function") renderDashboard();
+  if (data.linked_client) {
+    alert(`Marked as ${status}. ${data.linked_client.name} is now Closed Won.`);
+  }
+}
+
+function openLinkClientModal(status) {
+  const select = document.getElementById("linkClientSelect");
+  const eligible = allClients.filter(c => c.status === "Active" || c.status === "Deal In Progress");
+  document.getElementById("linkClientMsg").textContent =
+    `You're marking this property as ${status}. Link it to a client to record the deal?`;
+  select.innerHTML = `<option value="">— Don't link —</option>` +
+    eligible.map(c => `<option value="${c.id}">${c.name}${c.phone ? " · " + c.phone : ""} (${c.status})</option>`).join("");
+  document.getElementById("linkClientModal").classList.add("open");
+}
+
+function closeLinkClientModal() {
+  document.getElementById("linkClientModal").classList.remove("open");
+  pendingStatusChange = null;
+}
+
+async function confirmLinkClient(skip) {
+  if (!pendingStatusChange) { closeLinkClientModal(); return; }
+  const { propId, status } = pendingStatusChange;
+  const linkId = skip ? null : (document.getElementById("linkClientSelect").value || null);
+  document.getElementById("linkClientModal").classList.remove("open");
+  pendingStatusChange = null;
+  await applyStatusChange(propId, status, linkId);
 }
 
 // ─── Buyer Match Alert ────────────────────────────────────────────────────────
@@ -552,7 +636,7 @@ function updateClientStats() {
   const el = id => document.getElementById(id);
   if (el("clientStatActive")) el("clientStatActive").textContent = allClients.filter(c => c.status === "Active").length;
   if (el("clientStatInquiry")) el("clientStatInquiry").textContent = allClients.filter(c => c.status === "Inquiry").length;
-  if (el("clientStatClosed")) el("clientStatClosed").textContent = allClients.filter(c => c.status === "Closed").length;
+  if (el("clientStatClosed")) el("clientStatClosed").textContent = allClients.filter(c => c.status === "Closed Won" || c.status === "Closed Lost").length;
 }
 
 function setClientFilter(btn, filter) {
@@ -576,7 +660,13 @@ function getClientMatches(c) {
 }
 
 function clientStatusBadge(status) {
-  const map = { Active: "badge-client-active", Inquiry: "badge-client-inquiry", Closed: "badge-client-closed" };
+  const map = {
+    Active: "badge-client-active",
+    Inquiry: "badge-client-inquiry",
+    "Deal In Progress": "badge-client-progress",
+    "Closed Won": "badge-client-won",
+    "Closed Lost": "badge-client-lost",
+  };
   return `<span class="badge ${map[status] || "badge-client-inquiry"}">${status}</span>`;
 }
 
@@ -943,7 +1033,7 @@ function renderConfirmCard(p) {
   const CONFIGS = ["1BHK","2BHK","3BHK","4BHK+","Shop/Office","Plot","Other"];
   const TYPES = ["Apartment","House","Villa","Office","Shop","Land","Warehouse"];
   const UNITS = ["Sq Ft","Sq Yards","Gaj","Marla","Kanal","Bigha"];
-  const STATUSES = ["Available","Reserved","Sold","Rented"];
+  const STATUSES = ["Available","Reserved","Under Negotiation","Sold","Rented","Withdrawn"];
 
   const initSqft = p.area_value && p.area_unit && p.area_unit !== "Sq Ft"
     ? `≈ ${roundArea(toSqft(p.area_value, p.area_unit))} Sq Ft`

@@ -38,10 +38,10 @@ A Flask-based property management dashboard for real estate brokers — manage i
 
 ## Product
 
-- **Inventory Management**: Add, edit, delete properties (type, location, size in sq ft, price in Rs, status)
+- **Inventory Management**: Add, edit, delete properties (type, location, size in sq ft, price in Rs, status). Property statuses: Available, Reserved, Under Negotiation, Sold, Rented, Withdrawn (color-coded badges). Quick-action "Status" button on each property opens a menu to change status without opening the full edit form; choosing Sold/Rented prompts to link a client (sets them to Closed Won)
 - **Instant Search & Filter**: Search by location/type, filter by status and property type
 - **AI WhatsApp Matcher**: Paste a client's WhatsApp message → AI returns ranked matching properties with explanation; save result as Client (Inquiry status)
-- **Clients**: Unified buyer+inquiry database. Status: Active (serious buyer, auto-matched), Inquiry (lead), Closed. Filter pills (All/Active/Inquiry/Closed), client cards with WhatsApp button, match badge for Active clients showing available inventory matches
+- **Clients**: Unified buyer+inquiry database. Statuses: Active (serious buyer, auto-matched), Inquiry (lead), Deal In Progress, Closed Won, Closed Lost. Filter pills (All/Active/Inquiry/Closed), client cards with WhatsApp button, match badge for Active clients showing available inventory matches
 - **Auto-Match Alert**: When a property is added, Active clients with matching requirements trigger a popup with WhatsApp links
 - **Follow-ups**: Log reminders with client name, note, reminder date; overdue follow-ups shown in red at top with count badge on tab
 - **Login**: Simple session auth; default admin/broker123, configurable via env vars
@@ -59,6 +59,10 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Follow-up overdue = status=="Pending" AND reminder_date < TODAY (ISO date comparison)
 - Login credentials: BROKER_USERNAME (default: admin) / BROKER_PASSWORD (default: broker123) env vars
 - `db.row_factory = sqlite3.Row` is set at the top of `init_db()` for named-column access during migration
+- Property `closed_at` (TEXT, ISO date) is set when status becomes Sold/Rented and cleared otherwise via `_resolve_closed_at()`; "Deals This Month" counts properties whose `closed_at` falls in the current calendar month. Migration backfills existing Sold/Rented rows unconditionally to `date(created_at)`
+- Client status migration `Closed`→`Closed Lost` runs once via settings flag `client_status_v2`
+- `PATCH /api/properties/<id>/status` body `{status, link_client_id}` sets status+closed_at; if link_client_id set and status is Sold/Rented, that client becomes Closed Won. Returns `{property, linked_client}`. Validates status against `VALID_PROPERTY_STATUSES` (400) and link_client_id existence (404)
+- Property status is enum-validated on POST/PUT/PATCH against `VALID_PROPERTY_STATUSES`
 
 ## Pointers
 

@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import functools
+from datetime import date
 from flask import Flask, request, jsonify, render_template, g, session, redirect, url_for
 
 app = Flask(__name__)
@@ -21,6 +22,8 @@ UNIT_TO_SQFT = {
 }
 VALID_UNITS = list(UNIT_TO_SQFT.keys())
 VALID_CONFIGS = ["1BHK", "2BHK", "3BHK", "4BHK+", "Shop/Office", "Plot", "Other"]
+VALID_PROPERTY_STATUSES = ["Available", "Reserved", "Under Negotiation", "Sold", "Rented", "Withdrawn"]
+CLOSED_PROPERTY_STATUSES = ("Sold", "Rented")
 
 def to_sqft(value, unit):
     return round(float(value) * UNIT_TO_SQFT.get(unit, 1), 2)
@@ -89,6 +92,7 @@ def init_db():
             size REAL NOT NULL DEFAULT 0,
             price REAL NOT NULL,
             status TEXT NOT NULL DEFAULT 'Available',
+            closed_at TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
@@ -118,6 +122,22 @@ def init_db():
             db.execute("ALTER TABLE properties ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
         except Exception:
             pass
+
+    # closed_at migration — tracks when a property was marked Sold/Rented
+    current_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()]
+    if 'closed_at' not in current_cols:
+        try:
+            db.execute("ALTER TABLE properties ADD COLUMN closed_at TEXT")
+        except Exception:
+            pass
+    # Unconditional backfill so any Sold/Rented row missing a close date is repaired
+    try:
+        db.execute(
+            "UPDATE properties SET closed_at = date(created_at) "
+            "WHERE status IN ('Sold', 'Rented') AND (closed_at IS NULL OR closed_at = '')"
+        )
+    except Exception:
+        pass
 
     db.execute("""
         CREATE TABLE IF NOT EXISTS settings (
@@ -198,6 +218,15 @@ def init_db():
                 )
         db.execute(
             "INSERT INTO settings (key, value) VALUES ('clients_v1', '1') "
+            "ON CONFLICT(key) DO UPDATE SET value='1'"
+        )
+
+    # One-time migration: legacy client status 'Closed' → 'Closed Lost'
+    status_migrated = db.execute("SELECT value FROM settings WHERE key='client_status_v2'").fetchone()
+    if not status_migrated:
+        db.execute("UPDATE clients SET status='Closed Lost' WHERE status='Closed'")
+        db.execute(
+            "INSERT INTO settings (key, value) VALUES ('client_status_v2', '1') "
             "ON CONFLICT(key) DO UPDATE SET value='1'"
         )
     db.commit()
@@ -304,15 +333,18 @@ def add_property():
     required = ["property_type", "location", "configuration", "area_value", "area_unit", "price", "status"]
     if not all(k in data for k in required):
         return jsonify({"error": "Missing required fields"}), 400
+    if data["status"] not in VALID_PROPERTY_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
 
     sqft = to_sqft(data["area_value"], data["area_unit"])
+    closed_at = date.today().isoformat() if data["status"] in CLOSED_PROPERTY_STATUSES else None
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status, notes) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status, notes, closed_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (data["property_type"], data["location"], data["configuration"],
          float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"], data.get("notes", ""))
+         float(data["price"]), data["status"], data.get("notes", ""), closed_at)
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (cursor.lastrowid,)).fetchone()
@@ -334,17 +366,59 @@ def delete_property(prop_id):
 @login_required
 def update_property(prop_id):
     data = request.get_json()
+    if data.get("status") not in VALID_PROPERTY_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
     sqft = to_sqft(data["area_value"], data["area_unit"])
     db = get_db()
+    existing = db.execute("SELECT closed_at FROM properties WHERE id = ?", (prop_id,)).fetchone()
+    closed_at = _resolve_closed_at(data["status"], existing["closed_at"] if existing else None)
     db.execute(
-        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=?, notes=? WHERE id=?",
+        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=?, notes=?, closed_at=? WHERE id=?",
         (data["property_type"], data["location"], data["configuration"],
          float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"], data.get("notes", ""), prop_id)
+         float(data["price"]), data["status"], data.get("notes", ""), closed_at, prop_id)
     )
     db.commit()
     row = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
     return jsonify(dict(row))
+
+
+def _resolve_closed_at(status, existing_closed_at):
+    """Set closed_at to today when newly Sold/Rented, preserve if already closed, clear otherwise."""
+    if status in CLOSED_PROPERTY_STATUSES:
+        return existing_closed_at or date.today().isoformat()
+    return None
+
+
+@app.route("/api/properties/<int:prop_id>/status", methods=["PATCH"])
+@login_required
+def update_property_status(prop_id):
+    data = request.get_json()
+    new_status = (data.get("status") or "").strip()
+    if not new_status:
+        return jsonify({"error": "status is required"}), 400
+    if new_status not in VALID_PROPERTY_STATUSES:
+        return jsonify({"error": "Invalid status"}), 400
+    db = get_db()
+    existing = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
+    if not existing:
+        return jsonify({"error": "Property not found"}), 404
+
+    linked_client = None
+    link_client_id = data.get("link_client_id")
+    if link_client_id and new_status in CLOSED_PROPERTY_STATUSES:
+        crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
+        if not crow:
+            return jsonify({"error": "Linked client not found"}), 404
+        db.execute("UPDATE clients SET status='Closed Won' WHERE id=?", (link_client_id,))
+        crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
+        linked_client = dict(crow) if crow else None
+
+    closed_at = _resolve_closed_at(new_status, existing["closed_at"])
+    db.execute("UPDATE properties SET status=?, closed_at=? WHERE id=?", (new_status, closed_at, prop_id))
+    db.commit()
+    prop = dict(db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone())
+    return jsonify({"property": prop, "linked_client": linked_client})
 
 
 # ─── Inquiries ──────────────────────────────────────────────────────────────
