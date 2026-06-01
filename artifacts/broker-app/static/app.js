@@ -38,7 +38,7 @@ function formatArea(p) {
   const sqft = p.size;
   if (!v && !sqft) return "—";
   if (!v || u === "Sq Ft") return `${roundArea(sqft || v)} Sq Ft`;
-  return `${roundArea(v)} ${u}<br><span class="sqft-sub">${roundArea(sqft)} Sq Ft</span>`;
+  return `${roundArea(v)} ${u}`;
 }
 
 function updateAreaConversion(valueId, unitId, displayId) {
@@ -238,7 +238,7 @@ function buildShareText(p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
   const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
   const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
-    ? `${roundArea(p.area_value)} ${p.area_unit} (${roundArea(p.size)} Sq Ft)`
+    ? `${roundArea(p.area_value)} ${p.area_unit}`
     : `${roundArea(p.size || p.area_value)} Sq Ft`;
   const n = Number(p.price);
   const priceFormatted = n >= 10000000
@@ -767,10 +767,6 @@ function renderClients() {
               <span class="client-card-name">${c.name}</span>
               ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone">${c.phone}</a>` : ""}
             </div>
-            <div class="client-card-actions">
-              <button class="btn-icon btn-edit" onclick="openEditClientModal(${c.id})">Edit</button>
-              <button class="btn-icon btn-delete" onclick="deleteClient(${c.id})">Delete</button>
-            </div>
           </div>
           ${clientStatusBadge(c.status) || matchBadge ? `
           <div class="client-card-meta">
@@ -787,7 +783,7 @@ function renderClients() {
         <div class="client-card-footer">
           ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>` : "<span></span>"}
           <div style="display:flex;gap:6px;">
-            <button class="btn-sm-icon edit" onclick="openEditClientModal(${c.id})">Edit</button>
+            <button class="btn-fu-edit" onclick="openEditClientModal(${c.id})">Edit</button>
             <button class="btn-fu-delete" onclick="deleteClient(${c.id})">Delete</button>
           </div>
         </div>

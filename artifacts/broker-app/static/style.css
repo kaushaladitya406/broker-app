@@ -378,7 +378,12 @@ td {
 }
 
 /* ─── Filter Pills ──────────────────────────────────────────────────────── */
-.filter-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-pills {
+  display: flex; gap: 6px; flex-wrap: nowrap;
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.filter-pills::-webkit-scrollbar { display: none; }
 .filter-pill {
   background: var(--soft);
   border: 1px solid var(--border);
@@ -390,6 +395,8 @@ td {
   cursor: pointer;
   transition: all 0.12s;
   font-family: inherit;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .filter-pill:hover { background: var(--border); color: var(--text); }
 .filter-pill.active { background: var(--primary); color: white; border-color: var(--primary); }
