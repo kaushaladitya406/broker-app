@@ -83,8 +83,12 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
   padding: 14px 0 0;
   margin-bottom: 18px;
   border-bottom: 2px solid var(--border);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.tabs-bar::-webkit-scrollbar { display: none; }
 .tab-btn {
   background: none;
   border: none;
@@ -100,6 +104,9 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 16px 40px; }
   display: flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-height: 44px;
 }
 .tab-btn:hover { color: var(--primary); background: var(--primary-light); }
 .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); background: var(--primary-light); }
@@ -841,19 +848,147 @@ textarea#whatsappMsg::placeholder { color: #9ca3af; }
 }
 
 /* ─── Responsive ─────────────────────────────────────────────────────── */
-@media (max-width: 700px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .section-header { flex-direction: column; align-items: flex-start; }
-  .filters-row { width: 100%; }
-  .search-input { min-width: unset; flex: 1; }
-  .form-row { grid-template-columns: 1fr; }
-  th, td { padding: 8px 10px; }
-  .match-list { grid-template-columns: 1fr; }
-  .tab-btn { padding: 8px 10px; font-size: 12px; }
-  .msg-cell { max-width: 120px; }
+
+/* Button minimum tap target */
+.btn-primary, .btn-cancel, .match-btn, .parse-btn, .add-btn-header {
+  min-height: 44px;
 }
+
+@media (max-width: 700px) {
+  /* Layout */
+  main { padding: 0 12px 40px; }
+
+  /* Stats: 2×2 grid */
+  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat-value { font-size: 20px; }
+
+  /* Section header stacks vertically */
+  .section-header { flex-direction: column; align-items: flex-start; }
+  .filters-row { width: 100%; flex-direction: column; }
+  .search-input { min-width: unset; width: 100%; }
+  .filter-select { width: 100%; }
+
+  /* Forms: single column */
+  .form-row { grid-template-columns: 1fr; }
+
+  /* Confirm card fields: single column */
+  .confirm-fields { grid-template-columns: 1fr; }
+
+  /* Buttons: full width on mobile for key actions */
+  .match-btn, .parse-btn { width: 100%; justify-content: center; }
+
+  /* AI matcher */
+  .match-list { grid-template-columns: 1fr; }
+  .msg-cell { max-width: none; }
+
+  /* Settings: remove max-width constraint */
+  .settings-section { max-width: none; }
+
+  /* Header: hide subtitle to save space */
+  .header-sub { display: none; }
+  .add-btn-header { font-size: 13px; padding: 8px 12px; }
+
+  /* ── Table → Card layout ─────────────────────────────── */
+  .table-wrap { overflow-x: unset; }
+  .table-wrap table, .table-wrap tbody { display: block; width: 100%; }
+  .table-wrap thead { display: none; }
+
+  /* Each row becomes a card */
+  .table-wrap tr.prop-row {
+    display: block;
+    background: var(--surface);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  /* Each cell is a label + value row */
+  .table-wrap td {
+    display: flex;
+    align-items: center;
+    padding: 9px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 14px;
+    min-height: 40px;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+  }
+  .table-wrap td:first-child { border-top: none; }
+
+  /* The data-label as a prefix column */
+  .table-wrap td[data-label]::before {
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    min-width: 72px;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+
+  /* Actions cell: no label, buttons aligned right */
+  .table-wrap td.actions-cell {
+    justify-content: flex-end;
+    gap: 10px;
+    background: var(--bg);
+    padding: 10px 14px;
+    border-top: 1px solid var(--border);
+  }
+  .table-wrap td.actions-cell::before { display: none; }
+
+  /* Bigger tap targets for icon buttons */
+  .btn-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 17px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+
+  /* Notes expand row stays as a card continuation */
+  .table-wrap tr.notes-expand-row {
+    display: block;
+    margin-top: -13px;
+    margin-bottom: 12px;
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    border-top: none;
+    overflow: hidden;
+  }
+  .table-wrap tr.notes-expand-row td {
+    border: none;
+    padding: 0;
+    min-height: unset;
+  }
+  .table-wrap tr.notes-expand-row td::before { display: none; }
+
+  /* Empty row stays centered */
+  .table-wrap tr:has(.empty-row) { display: block; }
+  .table-wrap .empty-row {
+    display: block;
+    text-align: center;
+    padding: 32px 16px !important;
+    border: none;
+  }
+}
+
 @media (max-width: 420px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  main { padding: 0 8px 40px; }
+  .stats-grid { gap: 8px; }
+  .stat-card { padding: 12px; gap: 8px; }
+  .stat-icon { width: 36px; height: 36px; font-size: 16px; }
   .stat-value { font-size: 18px; }
-  main { padding: 0 10px 40px; }
+  .quick-add-header { padding: 12px 14px; }
+  .quick-add-body { padding: 0 14px 16px; }
+  .modal-body { padding: 16px; }
+  .modal-footer { padding: 12px 16px; }
+  .modal-header { padding: 14px 16px 12px; }
 }

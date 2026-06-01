@@ -262,15 +262,15 @@ function renderTable(props) {
     const hasNotes = p.notes && p.notes.trim();
     return `
     <tr class="prop-row">
-      <td><span class="type-tag">${p.property_type}</span></td>
-      <td>
+      <td data-label="Type"><span class="type-tag">${p.property_type}</span></td>
+      <td data-label="Location">
         <span class="location-text">${p.location}</span>
         ${hasNotes ? `<button class="notes-toggle-btn" id="notes-toggle-${p.id}" onclick="toggleNotes(${p.id})" title="View notes & features">💬</button>` : ""}
       </td>
-      <td>${configTag(p.configuration)}</td>
-      <td class="area-cell">${formatArea(p)}</td>
-      <td>${formatPrice(p.price)}</td>
-      <td>${statusBadge(p.status)}</td>
+      <td data-label="Config">${configTag(p.configuration)}</td>
+      <td data-label="Area" class="area-cell">${formatArea(p)}</td>
+      <td data-label="Price">${formatPrice(p.price)}</td>
+      <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
         <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">📤</button>
         <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">✏️</button>
@@ -508,11 +508,11 @@ function renderInquiries(inquiries) {
     const propCount = Array.isArray(inq.matched_property_ids) ? inq.matched_property_ids.length : 0;
     const shortMsg = inq.whatsapp_message.length > 60 ? inq.whatsapp_message.slice(0, 60) + "…" : inq.whatsapp_message;
     return `<tr class="prop-row">
-      <td><strong>${inq.client_name}</strong></td>
-      <td class="msg-cell" title="${inq.whatsapp_message}">${shortMsg}</td>
-      <td><span class="prop-count-badge">${propCount} propert${propCount !== 1 ? "ies" : "y"}</span></td>
-      <td>${inquiryStatusBadge(inq.status)}</td>
-      <td><div class="inq-meta">${date}</div>${inq.notes ? `<div class="inq-notes">${inq.notes}</div>` : ""}</td>
+      <td data-label="Client"><strong>${inq.client_name}</strong></td>
+      <td data-label="Message" class="msg-cell" title="${inq.whatsapp_message}">${shortMsg}</td>
+      <td data-label="Matched"><span class="prop-count-badge">${propCount} propert${propCount !== 1 ? "ies" : "y"}</span></td>
+      <td data-label="Status">${inquiryStatusBadge(inq.status)}</td>
+      <td data-label="Date"><div class="inq-meta">${date}</div>${inq.notes ? `<div class="inq-notes">${inq.notes}</div>` : ""}</td>
       <td class="actions-cell">
         <button class="btn-icon btn-edit" onclick="openEditInquiry(${inq.id})" title="Edit">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteInquiry(${inq.id})" title="Delete">🗑️</button>
@@ -571,16 +571,16 @@ function renderBuyers(buyers) {
   }
   tbody.innerHTML = buyers.map(b => `
     <tr class="prop-row">
-      <td><strong>${b.name}</strong></td>
-      <td><a href="tel:${b.phone}" class="phone-link">📞 ${b.phone}</a></td>
-      <td>${b.property_type ? `<span class="type-tag">${b.property_type}</span>` : '<span class="text-muted">Any</span>'}</td>
-      <td>${b.location || '<span class="text-muted">Any</span>'}</td>
-      <td class="budget-cell">
+      <td data-label="Name"><strong>${b.name}</strong></td>
+      <td data-label="Phone"><a href="tel:${b.phone}" class="phone-link">📞 ${b.phone}</a></td>
+      <td data-label="Type">${b.property_type ? `<span class="type-tag">${b.property_type}</span>` : '<span class="text-muted">Any</span>'}</td>
+      <td data-label="Location">${b.location || '<span class="text-muted">Any</span>'}</td>
+      <td data-label="Budget" class="budget-cell">
         ${b.budget_min || b.budget_max
           ? `${b.budget_min ? formatPrice(b.budget_min) : "—"} – ${b.budget_max ? formatPrice(b.budget_max) : "—"}`
           : '<span class="text-muted">Not set</span>'}
       </td>
-      <td class="msg-cell">${b.notes || ""}</td>
+      <td data-label="Notes" class="msg-cell">${b.notes || ""}</td>
       <td class="actions-cell">
         <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">✏️</button>
         <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">🗑️</button>
@@ -702,10 +702,10 @@ function renderFollowups(followups) {
       ? `<span class="badge badge-available">Done</span>`
       : `<span class="badge badge-reserved">Pending</span>`;
     return `<tr class="${rowClass}">
-      <td><strong>${f.client_name}</strong></td>
-      <td>${f.note}</td>
-      <td>${dateBadge}</td>
-      <td>${statusBadgeHtml}</td>
+      <td data-label="Client"><strong>${f.client_name}</strong></td>
+      <td data-label="Note">${f.note}</td>
+      <td data-label="Date">${dateBadge}</td>
+      <td data-label="Status">${statusBadgeHtml}</td>
       <td class="actions-cell">
         ${f.status === "Pending" ? `<button class="btn-icon" onclick="markFollowupDone(${f.id})" title="Mark Done">✅</button>` : ""}
         <button class="btn-icon btn-edit" onclick="openEditFollowupModal(${f.id})" title="Edit">✏️</button>
