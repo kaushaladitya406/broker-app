@@ -62,7 +62,7 @@ function formatPrice(n) {
 // ─── Tab routing ──────────────────────────────────────────────────────────────
 
 function showTab(tab) {
-  document.querySelectorAll(".sidebar-item").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".topnav-item").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".bottom-tab").forEach(b => b.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
   const navEl = document.getElementById(`nav-${tab}`);
@@ -115,7 +115,7 @@ function updateSettingsPreview() {
     if (placeholder) placeholder.style.display = "none";
     preview.innerHTML = `
       <div class="settings-preview-label">Preview in WhatsApp share:</div>
-      <div class="settings-preview-text">📞 Contact ${contact}${tagline ? `\n_${tagline}_` : ""}</div>
+      <div class="settings-preview-text">Contact ${contact}${tagline ? `\n${tagline}` : ""}</div>
     `;
   } else {
     preview.style.display = "none";
@@ -237,10 +237,10 @@ async function shareProperty(id, btn) {
   const text = buildShareText(p);
   try {
     await navigator.clipboard.writeText(text);
-    btn.textContent = "✅";
+    btn.textContent = "✓";
     btn.title = "Copied!";
     btn.classList.add("btn-share-copied");
-    setTimeout(() => { btn.textContent = "📤"; btn.title = "Copy WhatsApp message"; btn.classList.remove("btn-share-copied"); }, 1800);
+    setTimeout(() => { btn.textContent = "↗"; btn.title = "Copy WhatsApp message"; btn.classList.remove("btn-share-copied"); }, 1800);
   } catch {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -249,8 +249,8 @@ async function shareProperty(id, btn) {
     ta.select();
     document.execCommand("copy");
     document.body.removeChild(ta);
-    btn.textContent = "✅";
-    setTimeout(() => { btn.textContent = "📤"; }, 1800);
+    btn.textContent = "✓";
+    setTimeout(() => { btn.textContent = "↗"; }, 1800);
   }
 }
 
@@ -263,7 +263,7 @@ function toggleNotes(id) {
   const isHidden = row.style.display === "none" || !row.style.display;
   row.style.display = isHidden ? "table-row" : "none";
   if (btn) {
-    btn.textContent = isHidden ? "▲" : "💬";
+    btn.textContent = isHidden ? "▲" : "▾";
     btn.classList.toggle("notes-toggle-active", isHidden);
   }
 }
@@ -271,7 +271,7 @@ function toggleNotes(id) {
 function renderTable(props) {
   const tbody = document.getElementById("propertiesBody");
   if (!Array.isArray(props) || props.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-row"><div class="empty-state"><div class="empty-state-icon">🏘️</div><div class="empty-state-title">No properties found</div><div class="empty-state-msg">Add your first property using Quick Add AI above, or click + Add Property.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-row"><div class="empty-state"><div class="empty-state-title">No properties found</div><div class="empty-state-msg">Add your first property using Quick Add AI above, or click + Add Property.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div></td></tr>`;
     return;
   }
   tbody.innerHTML = props.map(p => {
@@ -281,16 +281,16 @@ function renderTable(props) {
       <td data-label="Type"><span class="type-tag">${p.property_type}</span></td>
       <td data-label="Location">
         <span class="location-text">${p.location}</span>
-        ${hasNotes ? `<button class="notes-toggle-btn" id="notes-toggle-${p.id}" onclick="toggleNotes(${p.id})" title="View notes & features">💬</button>` : ""}
+        ${hasNotes ? `<button class="notes-toggle-btn" id="notes-toggle-${p.id}" onclick="toggleNotes(${p.id})" title="View notes & features">▾</button>` : ""}
       </td>
       <td data-label="Config">${configTag(p.configuration)}</td>
       <td data-label="Area" class="area-cell">${formatArea(p)}</td>
       <td data-label="Price">${formatPrice(p.price)}</td>
       <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
-        <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">📤</button>
-        <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">✏️</button>
-        <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">🗑️</button>
+        <button class="btn-icon btn-share" onclick="shareProperty(${p.id}, this)" title="Copy WhatsApp message">↗</button>
+        <button class="btn-icon btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
+        <button class="btn-icon btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Del</button>
       </td>
     </tr>
     ${hasNotes ? `
@@ -392,11 +392,11 @@ function showBuyerMatchModal(buyers, prop) {
   const list = document.getElementById("buyerMatchList");
   list.innerHTML = buyers.map(b => `
     <div class="buyer-match-card">
-      <div class="buyer-match-name">👤 ${b.name} <span class="buyer-phone">📞 ${b.phone}</span></div>
+      <div class="buyer-match-name">${b.name} <span class="buyer-phone">${b.phone}</span></div>
       <div class="buyer-match-detail">
         ${b.property_type ? `<span class="type-tag">${b.property_type}</span>` : ""}
-        ${b.location ? `📍 ${b.location}` : ""}
-        ${(b.budget_min || b.budget_max) ? `💰 ${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}` : ""}
+        ${b.location ? `${b.location}` : ""}
+        ${(b.budget_min || b.budget_max) ? `${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}` : ""}
       </div>
       ${b.notes ? `<div class="buyer-match-notes">${b.notes}</div>` : ""}
     </div>
@@ -442,15 +442,15 @@ async function matchProperties() {
             <span class="type-tag">${p.property_type}</span>
             ${statusBadge(p.status)}
           </div>
-          <div class="match-card-location">📍 ${p.location}</div>
+          <div class="match-card-location">${p.location}</div>
           <div class="match-card-details">
-            <span>📐 ${p.area_value ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit}` : `${Number(p.size).toLocaleString("en-IN")} Sq Ft`}</span>
-            <span>💰 ${formatPrice(p.price)}</span>
+            <span>${p.area_value ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit}` : `${Number(p.size).toLocaleString("en-IN")} Sq Ft`}</span>
+            <span>${formatPrice(p.price)}</span>
           </div>
-          ${p.notes ? `<div class="match-card-notes">📝 ${p.notes}</div>` : ""}
+          ${p.notes ? `<div class="match-card-notes">${p.notes}</div>` : ""}
         </div>
       `).join("") + `</div>`;
-      html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">💾 Save as Inquiry</button>`;
+      html += `<button class="save-inquiry-btn" onclick="openSaveInquiryModal()">Save as Inquiry</button>`;
     }
     resultDiv.innerHTML = html;
   } catch (err) {
@@ -516,7 +516,7 @@ function inquiryStatusBadge(status) {
 function renderInquiries(inquiries) {
   const tbody = document.getElementById("inquiriesBody");
   if (!Array.isArray(inquiries) || inquiries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><div class="empty-state"><div class="empty-state-icon">📁</div><div class="empty-state-title">No inquiries yet</div><div class="empty-state-msg">Use the AI Matcher tab to match a client's message to properties, then save the result as an inquiry.</div><button class="btn-primary" onclick="showTab('matcher')">Go to AI Matcher</button></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-row"><div class="empty-state"><div class="empty-state-title">No inquiries yet</div><div class="empty-state-msg">Use the AI Matcher tab to match a client's message to properties, then save the result as an inquiry.</div><button class="btn-primary" onclick="showTab('matcher')">Go to AI Matcher</button></div></td></tr>`;
     return;
   }
   tbody.innerHTML = inquiries.map(inq => {
@@ -530,8 +530,8 @@ function renderInquiries(inquiries) {
       <td data-label="Status">${inquiryStatusBadge(inq.status)}</td>
       <td data-label="Date"><div class="inq-meta">${date}</div>${inq.notes ? `<div class="inq-notes">${inq.notes}</div>` : ""}</td>
       <td class="actions-cell">
-        <button class="btn-icon btn-edit" onclick="openEditInquiry(${inq.id})" title="Edit">✏️</button>
-        <button class="btn-icon btn-delete" onclick="deleteInquiry(${inq.id})" title="Delete">🗑️</button>
+        <button class="btn-icon btn-edit" onclick="openEditInquiry(${inq.id})" title="Edit">Edit</button>
+        <button class="btn-icon btn-delete" onclick="deleteInquiry(${inq.id})" title="Delete">Del</button>
       </td>
     </tr>`;
   }).join("");
@@ -595,7 +595,6 @@ function renderBuyers(buyers) {
   if (!Array.isArray(buyers) || buyers.length === 0) {
     grid.innerHTML = `
       <div class="empty-state" style="grid-column:1/-1">
-        <div class="empty-state-icon">👤</div>
         <div class="empty-state-title">No buyers saved yet</div>
         <div class="empty-state-msg">Add buyers to receive auto-match alerts when a property matching their requirements is added.</div>
         <button class="btn-primary" onclick="openAddBuyerModal()">+ Add Buyer</button>
@@ -605,7 +604,7 @@ function renderBuyers(buyers) {
   grid.innerHTML = buyers.map(b => {
     const matchCount = countBuyerMatches(b);
     const matchBadge = matchCount > 0
-      ? `<span class="buyer-matches-badge">✅ ${matchCount} match${matchCount !== 1 ? "es" : ""}</span>`
+      ? `<span class="buyer-matches-badge">${matchCount} match${matchCount !== 1 ? "es" : ""}</span>`
       : `<span class="buyer-no-match-badge">No matches</span>`;
     const budgetText = (b.budget_min || b.budget_max)
       ? `${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}`
@@ -614,18 +613,18 @@ function renderBuyers(buyers) {
       <div class="buyer-card">
         <div class="buyer-card-head">
           <div>
-            <div class="buyer-card-name">👤 ${b.name}</div>
-            <a href="tel:${b.phone}" class="buyer-card-phone">📞 ${b.phone}</a>
+            <div class="buyer-card-name">${b.name}</div>
+            <a href="tel:${b.phone}" class="buyer-card-phone">${b.phone}</a>
           </div>
           <div class="buyer-card-actions">
-            <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">✏️</button>
-            <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">🗑️</button>
+            <button class="btn-icon btn-edit" onclick="openEditBuyerModal(${b.id})" title="Edit">Edit</button>
+            <button class="btn-icon btn-delete" onclick="deleteBuyer(${b.id})" title="Delete">Del</button>
           </div>
         </div>
         <div class="buyer-card-body">
           ${b.property_type ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Type</span><span class="type-tag">${b.property_type}</span></div>` : ""}
-          ${b.location ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Location</span><span class="buyer-detail-value">📍 ${b.location}</span></div>` : ""}
-          <div class="buyer-detail-row"><span class="buyer-detail-label">Budget</span><span class="buyer-detail-value">💰 ${budgetText}</span></div>
+          ${b.location ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Location</span><span class="buyer-detail-value">${b.location}</span></div>` : ""}
+          <div class="buyer-detail-row"><span class="buyer-detail-label">Budget</span><span class="buyer-detail-value">${budgetText}</span></div>
           ${b.notes ? `<div class="buyer-detail-row"><span class="buyer-detail-label">Notes</span><span class="buyer-detail-value">${b.notes}</span></div>` : ""}
         </div>
         <div class="buyer-card-footer">
@@ -732,7 +731,7 @@ function renderDashboard() {
   if (!recentEl) return;
   const recent = allProperties.slice(0, 6);
   if (recent.length === 0) {
-    recentEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🏘️</div><div class="empty-state-title">No properties yet</div><div class="empty-state-msg">Add your first property to get started.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div>`;
+    recentEl.innerHTML = `<div class="empty-state"><div class="empty-state-title">No properties yet</div><div class="empty-state-msg">Add your first property to get started.</div><button class="btn-primary" onclick="openAddModal()">+ Add Property</button></div>`;
     return;
   }
   recentEl.innerHTML = `<div class="recent-grid">${recent.map(p => `
@@ -741,7 +740,7 @@ function renderDashboard() {
         <span class="type-tag">${p.property_type}</span>
         ${statusBadge(p.status)}
       </div>
-      <div class="recent-card-location">📍 ${p.location}</div>
+      <div class="recent-card-location">${p.location}</div>
       <div class="recent-card-details">
         ${configTag(p.configuration)} &bull; ${formatArea(p)} &bull; <strong>${formatPrice(p.price)}</strong>
       </div>
@@ -755,7 +754,6 @@ function renderFollowups(followups) {
   if (!Array.isArray(followups) || followups.length === 0) {
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-state-icon">🔔</div>
         <div class="empty-state-title">No follow-ups yet</div>
         <div class="empty-state-msg">Add reminders to follow up with clients. Overdue reminders appear in red, today's in orange.</div>
         <button class="btn-primary" onclick="openAddFollowupModal()">+ Add Follow-up</button>
@@ -771,7 +769,7 @@ function renderFollowups(followups) {
   if (overdueDiv) {
     if (overdue.length > 0) {
       overdueDiv.style.display = "block";
-      overdueDiv.innerHTML = `⚠️ <strong>${overdue.length} overdue follow-up${overdue.length !== 1 ? "s" : ""}</strong> — shown below in red. Mark them done once actioned.`;
+      overdueDiv.innerHTML = `<strong>${overdue.length} overdue follow-up${overdue.length !== 1 ? "s" : ""}</strong> — shown below in red. Mark them done once actioned.`;
     } else {
       overdueDiv.style.display = "none";
     }
@@ -783,10 +781,10 @@ function renderFollowups(followups) {
     const displayDate = new Date(f.reminder_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
     const cardClass = isOverdue ? "followup-card fu-overdue" : isToday ? "followup-card fu-today" : "followup-card";
     const dateBadge = isOverdue
-      ? `<span class="fu-date-badge overdue">⚠️ ${displayDate} — Overdue</span>`
+      ? `<span class="fu-date-badge overdue">${displayDate} — Overdue</span>`
       : isToday
-      ? `<span class="fu-date-badge today">📅 Today</span>`
-      : `<span class="fu-date-badge">📅 ${displayDate}</span>`;
+      ? `<span class="fu-date-badge today">Today</span>`
+      : `<span class="fu-date-badge">${displayDate}</span>`;
     const statusBadgeHtml = f.status === "Done"
       ? `<span class="badge badge-available">Done</span>`
       : `<span class="badge badge-reserved">Pending</span>`;
@@ -794,15 +792,15 @@ function renderFollowups(followups) {
     return `
       <div class="${cardClass}">
         <div class="followup-card-header">
-          <span class="followup-client">👤 ${f.client_name}</span>
+          <span class="followup-client">${f.client_name}</span>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${dateBadge} ${statusBadgeHtml}</div>
         </div>
         <div class="followup-note">${f.note}</div>
         <div class="followup-card-footer">
-          <a href="https://wa.me/?text=${waText}" target="_blank" class="btn-wa">💬 WhatsApp</a>
-          ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">✅ Mark Done</button>` : ""}
-          <button class="btn-sm-icon edit" onclick="openEditFollowupModal(${f.id})" title="Edit">✏️</button>
-          <button class="btn-sm-icon del" onclick="deleteFollowup(${f.id})" title="Delete">🗑️</button>
+          <a href="https://wa.me/?text=${waText}" target="_blank" class="btn-wa">WhatsApp</a>
+          ${f.status === "Pending" ? `<button class="btn-done" onclick="markFollowupDone(${f.id})">Mark Done</button>` : ""}
+          <button class="btn-sm-icon edit" onclick="openEditFollowupModal(${f.id})" title="Edit">Edit</button>
+          <button class="btn-sm-icon del" onclick="deleteFollowup(${f.id})" title="Delete">Del</button>
         </div>
       </div>`;
   }).join("");
@@ -898,16 +896,16 @@ async function parsePropertyText() {
     const data = await res.json();
     if (data.error && !data.property_type) {
       // Hard error — AI completely failed, no fields to show
-      resultDiv.innerHTML = `<p class="parse-error">⚠️ ${data.error}</p>`;
+      resultDiv.innerHTML = `<p class="parse-error">${data.error}</p>`;
       return;
     }
     parsedProperty = data;
     renderConfirmCard(data);
   } catch (err) {
-    resultDiv.innerHTML = `<p class="parse-error">⚠️ Error connecting to AI. Please try again.</p>`;
+    resultDiv.innerHTML = `<p class="parse-error">Error connecting to AI. Please try again.</p>`;
   } finally {
     btn.disabled = false;
-    btn.textContent = "✨ Parse with AI";
+    btn.textContent = "Parse with AI";
   }
 }
 
@@ -925,9 +923,8 @@ function renderConfirmCard(p) {
   resultDiv.innerHTML = `
     <div class="confirm-card">
       <div class="confirm-card-title">
-        <span class="confirm-card-icon">🔍</span>
         <span>Confirm extracted details</span>
-        ${p.assumptions ? `<span class="confirm-note" title="${p.assumptions}">ℹ️ AI made some assumptions</span>` : ""}
+        ${p.assumptions ? `<span class="confirm-note" title="${p.assumptions}">AI made some assumptions</span>` : ""}
       </div>
       ${p.assumptions ? `<div class="confirm-assumption">${p.assumptions}</div>` : ""}
       <div class="confirm-fields">
@@ -977,8 +974,8 @@ function renderConfirmCard(p) {
         </div>
       </div>
       <div class="confirm-actions">
-        <button class="btn-cancel" onclick="discardParsed()">✕ Discard</button>
-        <button class="btn-primary" id="confirmAddBtn" onclick="saveParsedProperty()">✅ Add to Inventory</button>
+        <button class="btn-cancel" onclick="discardParsed()">Discard</button>
+        <button class="btn-primary" id="confirmAddBtn" onclick="saveParsedProperty()">Add to Inventory</button>
       </div>
     </div>
   `;
@@ -1023,7 +1020,7 @@ async function saveParsedProperty() {
     }
   } catch (err) {
     btn.disabled = false;
-    btn.textContent = "✅ Add to Inventory";
+    btn.textContent = "Add to Inventory";
   }
 }
 
