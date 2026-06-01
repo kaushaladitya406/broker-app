@@ -1115,11 +1115,11 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   padding: 0;
 }
 .btab-icon {
-  font-size: 20px;
-  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--text-3);
   transition: color 0.12s;
-  font-style: normal;
 }
 .bottom-tab.active .btab-icon { color: var(--primary); }
 .bottom-tab:hover .btab-icon { color: var(--text-2); }

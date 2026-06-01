@@ -27,13 +27,19 @@ function toSqft(value, unit) {
   return Math.round(parseFloat(value) * (UNIT_TO_SQFT[unit] || 1) * 100) / 100;
 }
 
+function roundArea(n) {
+  const r = Math.round(Number(n) * 10) / 10;
+  if (r % 1 === 0) return Math.round(r).toLocaleString("en-IN");
+  return r.toLocaleString("en-IN", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+}
+
 function formatArea(p) {
   const v = p.area_value;
   const u = p.area_unit || "Sq Ft";
   const sqft = p.size;
   if (!v && !sqft) return "—";
-  if (!v || u === "Sq Ft") return `${Number(sqft || v).toLocaleString("en-IN")} Sq Ft`;
-  return `${Number(v).toLocaleString("en-IN")} ${u}<br><span class="sqft-sub">${Number(sqft).toLocaleString("en-IN")} Sq Ft</span>`;
+  if (!v || u === "Sq Ft") return `${roundArea(sqft || v)} Sq Ft`;
+  return `${roundArea(v)} ${u}<br><span class="sqft-sub">${roundArea(sqft)} Sq Ft</span>`;
 }
 
 function updateAreaConversion(valueId, unitId, displayId) {
@@ -192,8 +198,8 @@ function buildShareText(p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
   const statusEmoji = { Available: "✅", Reserved: "🔒", Sold: "❌", Rented: "🔑" };
   const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
-    ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit} (${Number(p.size).toLocaleString("en-IN")} Sq Ft)`
-    : `${Number(p.size || p.area_value).toLocaleString("en-IN")} Sq Ft`;
+    ? `${roundArea(p.area_value)} ${p.area_unit} (${roundArea(p.size)} Sq Ft)`
+    : `${roundArea(p.size || p.area_value)} Sq Ft`;
   const n = Number(p.price);
   const priceFormatted = n >= 10000000
     ? `Rs ${(n / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`
@@ -444,7 +450,7 @@ async function matchProperties() {
           </div>
           <div class="match-card-location">${p.location}</div>
           <div class="match-card-details">
-            <span>${p.area_value ? `${Number(p.area_value).toLocaleString("en-IN")} ${p.area_unit}` : `${Number(p.size).toLocaleString("en-IN")} Sq Ft`}</span>
+            <span>${p.area_value ? `${roundArea(p.area_value)} ${p.area_unit}` : `${roundArea(p.size)} Sq Ft`}</span>
             <span>${formatPrice(p.price)}</span>
           </div>
           ${p.notes ? `<div class="match-card-notes">${p.notes}</div>` : ""}
@@ -917,7 +923,7 @@ function renderConfirmCard(p) {
   const STATUSES = ["Available","Reserved","Sold","Rented"];
 
   const initSqft = p.area_value && p.area_unit && p.area_unit !== "Sq Ft"
-    ? `≈ ${Number(toSqft(p.area_value, p.area_unit)).toLocaleString("en-IN")} Sq Ft`
+    ? `≈ ${roundArea(toSqft(p.area_value, p.area_unit))} Sq Ft`
     : "";
 
   resultDiv.innerHTML = `
