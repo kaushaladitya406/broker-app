@@ -748,7 +748,7 @@ function renderClients() {
     const matches = getClientMatches(c);
     const matchBadge = c.status === "Active"
       ? (matches.length > 0
-          ? `<button class="client-match-badge" onclick="showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
+          ? `<button class="client-match-badge" onclick="event.stopPropagation(); showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
           : `<span class="client-no-match">No matches</span>`)
       : "";
     const budgetText = (c.budget_min || c.budget_max)
@@ -760,35 +760,41 @@ function renderClients() {
       ? `https://wa.me/${c.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${c.name}!`)}`
       : null;
     return `
-      <div class="client-card">
-        <div class="client-card-head">
-          <div class="client-card-top">
-            <div class="client-card-info">
-              <span class="client-card-name">${c.name}</span>
-              ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone">${c.phone}</a>` : ""}
-            </div>
-          </div>
-          ${clientStatusBadge(c.status) || matchBadge ? `
-          <div class="client-card-meta">
+      <div class="client-card" id="client-card-${c.id}">
+        <div class="client-card-summary" role="button" tabindex="0" aria-expanded="false" aria-controls="client-detail-${c.id}" onclick="toggleClientCard(${c.id})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleClientCard(${c.id});}">
+          <span class="client-card-name">${c.name}</span>
+          ${c.phone ? `<a href="tel:${c.phone}" class="client-card-phone" onclick="event.stopPropagation()">${c.phone}</a>` : ""}
+          <div class="client-card-badges">
             ${clientStatusBadge(c.status)}
             ${matchBadge}
-          </div>` : ""}
+          </div>
+          <span class="client-card-chevron" aria-hidden="true">▾</span>
         </div>
-        ${lookingForFull || budgetText || c.notes ? `
-        <div class="client-card-body">
-          ${lookingForFull ? `<div class="client-detail-row"><span class="client-detail-label">Needs</span><span class="client-detail-value">${lookingForFull}</span></div>` : ""}
-          ${budgetText ? `<div class="client-detail-row"><span class="client-detail-label">Budget</span><span class="client-detail-value">${budgetText}</span></div>` : ""}
-          ${c.notes ? `<div class="client-detail-row"><span class="client-detail-label">Notes</span><span class="client-detail-value">${c.notes}</span></div>` : ""}
-        </div>` : ""}
-        <div class="client-card-footer">
-          ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>` : "<span></span>"}
-          <div style="display:flex;gap:6px;">
-            <button class="btn-fu-edit" onclick="openEditClientModal(${c.id})">Edit</button>
-            <button class="btn-fu-delete" onclick="deleteClient(${c.id})">Delete</button>
+        <div class="client-card-detail" id="client-detail-${c.id}">
+          ${lookingForFull || budgetText || c.notes ? `
+          <div class="client-card-body">
+            ${lookingForFull ? `<div class="client-detail-row"><span class="client-detail-label">Needs</span><span class="client-detail-value">${lookingForFull}</span></div>` : ""}
+            ${budgetText ? `<div class="client-detail-row"><span class="client-detail-label">Budget</span><span class="client-detail-value">${budgetText}</span></div>` : ""}
+            ${c.notes ? `<div class="client-detail-row"><span class="client-detail-label">Notes</span><span class="client-detail-value">${c.notes}</span></div>` : ""}
+          </div>` : ""}
+          <div class="client-card-footer">
+            ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa">WhatsApp</a>` : "<span></span>"}
+            <div style="display:flex;gap:6px;">
+              <button class="btn-fu-edit" onclick="openEditClientModal(${c.id})">Edit</button>
+              <button class="btn-fu-delete" onclick="deleteClient(${c.id})">Delete</button>
+            </div>
           </div>
         </div>
       </div>`;
   }).join("");
+}
+
+function toggleClientCard(id) {
+  const card = document.getElementById(`client-card-${id}`);
+  if (!card) return;
+  const expanded = card.classList.toggle("expanded");
+  const summary = card.querySelector(".client-card-summary");
+  if (summary) summary.setAttribute("aria-expanded", expanded ? "true" : "false");
 }
 
 function showClientMatches(id) {

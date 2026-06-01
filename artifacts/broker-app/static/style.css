@@ -382,6 +382,7 @@ td {
   display: flex; gap: 6px; flex-wrap: nowrap;
   overflow-x: auto; -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  flex: 1 1 100%; min-width: 0;
 }
 .filter-pills::-webkit-scrollbar { display: none; }
 .filter-pill {
@@ -411,34 +412,36 @@ td {
   transition: box-shadow 0.15s;
 }
 .client-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
-.client-card-head {
-  padding: 12px 14px 10px;
+.client-card-summary {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  border-bottom: 1px solid var(--border);
-  background: var(--soft);
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.client-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.client-card-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.client-card-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.client-card-phone { font-size: 13px; color: var(--primary); text-decoration: none; }
+.client-card-summary:active { background: var(--soft); }
+.client-card-name { font-size: 14px; font-weight: 600; color: var(--text); flex-shrink: 0; }
+.client-card-phone { font-size: 13px; color: var(--primary); text-decoration: none; flex-shrink: 0; }
 .client-card-phone:hover { text-decoration: underline; }
-.client-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.client-card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.client-card-badges { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; margin-left: auto; }
+.client-card-chevron { color: var(--text-3); font-size: 12px; transition: transform 0.15s; flex-shrink: 0; }
+.client-card.expanded .client-card-chevron { transform: rotate(180deg); }
+.client-card-detail { display: none; border-top: 1px solid var(--border); }
+.client-card.expanded .client-card-detail { display: block; }
 .client-card-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 5px; }
 .client-detail-row { display: flex; align-items: flex-start; gap: 8px; font-size: 13px; }
 .client-detail-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.4px; min-width: 52px; flex-shrink: 0; padding-top: 1px; }
 .client-detail-value { color: var(--text-2); }
 .client-card-footer {
   padding: 8px 14px;
-  border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   background: var(--soft);
   gap: 8px;
 }
+.client-card-body + .client-card-footer { border-top: 1px solid var(--border); }
 /* Client status badges */
 .badge-client-active { background: #dcfce7; color: #15803d; }
 .badge-client-inquiry { background: #dbeafe; color: #1d4ed8; }
