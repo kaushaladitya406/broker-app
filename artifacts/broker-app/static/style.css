@@ -237,13 +237,26 @@ main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
   gap: 10px;
 }
 .section-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.section-header-actions { display: flex; align-items: center; gap: 8px; }
+.ai-add-link {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px;
+  font-size: 13px; font-weight: 500;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+  transition: all 0.12s;
+}
+.ai-add-link:hover { background: var(--soft); color: var(--text); border-color: var(--text-3); }
+.ai-add-link.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
 .filters-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .inventory-filters {
   display: flex; gap: 8px; padding: 10px 18px;
-  border-bottom: 1px solid var(--border); align-items: center; flex-wrap: wrap;
+  border-bottom: 1px solid var(--border); align-items: center; flex-wrap: nowrap;
 }
-.inventory-filters .search-input { flex: 1 1 200px; min-width: 150px; }
-.inventory-filters .filter-select { flex: 1 1 130px; min-width: 110px; }
+.inventory-filters .search-input { flex: 2 1 0; min-width: 0; width: auto; }
+.inventory-filters .filter-select { flex: 1 1 0; min-width: 0; width: auto; }
 .stats-grid-3 { grid-template-columns: repeat(3, 1fr); }
 
 /* ─── Form controls ─────────────────────────────────────────────────── */
@@ -1077,32 +1090,7 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
 #propNotes:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(35,131,226,0.1); }
 
 /* ─── Quick Add AI ──────────────────────────────────────────────────── */
-.quick-add-section {
-  background: var(--soft);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  margin-bottom: 16px;
-  overflow: hidden;
-}
-.quick-add-header {
-  padding: 12px 18px;
-  display: flex; align-items: center; justify-content: space-between;
-  cursor: pointer; user-select: none; gap: 12px;
-}
-.quick-add-header:hover { background: var(--border); }
-.quick-add-title { font-size: 14px; font-weight: 600; color: var(--text); }
-.quick-add-hint { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.quick-add-toggle {
-  background: var(--bg);
-  color: var(--text-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 4px 10px; font-size: 11.5px; font-weight: 500;
-  cursor: pointer; white-space: nowrap; flex-shrink: 0;
-  font-family: inherit;
-}
-.quick-add-toggle:hover { background: var(--border); }
-.quick-add-body { padding: 0 18px 18px; border-top: 1px solid var(--border); }
+.quick-add-body { padding: 14px 18px; border-bottom: 1px solid var(--border); background: var(--soft); }
 .quick-add-textarea {
   width: 100%;
   border: 1px solid var(--border);
@@ -1323,10 +1311,9 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   .stats-grid-3 .stat-value { font-size: 22px; }
   .summary-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .summary-card-value { font-size: 20px; }
-  .section-header { flex-direction: column; align-items: flex-start; }
   .filters-row { width: 100%; flex-direction: column; }
-  .search-input { min-width: unset; width: 100%; }
-  .filter-select { width: 100%; }
+  .filters-row .search-input { min-width: unset; width: 100%; }
+  .filters-row .filter-select { width: 100%; }
   .form-row { grid-template-columns: 1fr; }
   .confirm-fields { grid-template-columns: 1fr; }
   .match-list { grid-template-columns: 1fr; }

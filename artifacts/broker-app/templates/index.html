@@ -96,27 +96,20 @@
         <div class="page-title">Inventory</div>
       </div>
 
-      <div class="quick-add-section">
-        <div class="quick-add-header" onclick="toggleQuickAdd()">
-          <div>
-            <div class="quick-add-title">Quick Add via AI</div>
-            <div class="quick-add-hint">Describe a property in plain text and AI will extract the details</div>
+      <div class="section">
+        <div class="section-header">
+          <div class="section-title">Properties</div>
+          <div class="section-header-actions">
+            <button class="ai-add-link" id="quickAddToggle" onclick="toggleQuickAdd()" title="Add a property via AI">✨ AI Add</button>
+            <button class="btn-primary" onclick="openAddModal()">+ Add</button>
           </div>
-          <button class="quick-add-toggle" id="quickAddToggle">Hide</button>
         </div>
-        <div class="quick-add-body" id="quickAddBody">
+        <div class="quick-add-body" id="quickAddBody" style="display:none">
           <textarea id="quickAddText" class="quick-add-textarea" placeholder="e.g. '3BHK flat Sector 22 Chandigarh 15000 rent available'
 or '2BHK apartment Urban Estate Patiala 8000 per month'
 or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
           <button class="parse-btn" id="parseBtn" onclick="parsePropertyText()">Parse with AI</button>
           <div id="parseResult"></div>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="section-header">
-          <div class="section-title">Properties</div>
-          <button class="btn-primary" onclick="openAddModal()">+ Add</button>
         </div>
         <div class="inventory-filters">
           <input type="text" id="searchInput" class="search-input" placeholder="Search location or type..." />

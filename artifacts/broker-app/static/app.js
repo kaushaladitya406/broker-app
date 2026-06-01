@@ -994,7 +994,9 @@ function toggleQuickAdd() {
   const btn = document.getElementById("quickAddToggle");
   const isHidden = body.style.display === "none";
   body.style.display = isHidden ? "block" : "none";
-  btn.textContent = isHidden ? "▲ Hide" : "▼ Show";
+  btn.classList.toggle("active", isHidden);
+  btn.textContent = isHidden ? "✕ Close AI" : "✨ AI Add";
+  if (isHidden) document.getElementById("quickAddText").focus();
 }
 
 async function parsePropertyText() {
