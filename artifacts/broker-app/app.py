@@ -310,9 +310,24 @@ def add_property():
         "notes": data.get("notes", ""),
         "closed_at": closed_at,
     }
-    result = supa().table("properties").insert(row_data).execute()
-    prop = enrich_property(result.data[0])
-    buyer_matches = find_matching_buyers(uid, prop)
+    try:
+        result = supa().table("properties").insert(row_data).execute()
+    except Exception as exc:
+        app.logger.error("add_property insert error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+    if not result.data:
+        msg = "Insert returned no data — the properties table may be missing the listing_type column. Run the migration SQL in Supabase."
+        app.logger.error("add_property: %s", msg)
+        return jsonify({"error": msg}), 500
+
+    try:
+        prop = enrich_property(result.data[0])
+        buyer_matches = find_matching_buyers(uid, prop)
+    except Exception as exc:
+        app.logger.error("add_property post-insert error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
     return jsonify({"property": prop, "buyer_matches": buyer_matches}), 201
 
 
@@ -350,7 +365,15 @@ def update_property(prop_id):
         "notes": data.get("notes", ""),
         "closed_at": closed_at,
     }
-    result = supa().table("properties").update(update_data).eq("id", prop_id).eq("user_id", uid).execute()
+    try:
+        result = supa().table("properties").update(update_data).eq("id", prop_id).eq("user_id", uid).execute()
+    except Exception as exc:
+        app.logger.error("update_property error: %s", exc)
+        return jsonify({"error": str(exc)}), 500
+
+    if not result.data:
+        return jsonify({"error": "Update returned no data — check Supabase table schema."}), 500
+
     return jsonify(enrich_property(result.data[0]))
 
 

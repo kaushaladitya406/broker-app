@@ -541,11 +541,17 @@ async function saveProperty(e) {
   btn.textContent = "Saving...";
   try {
     if (editingId) {
-      await apiFetch(`${API}/api/properties/${editingId}`, {
+      const res = await apiFetch(`${API}/api/properties/${editingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+      if (!res) return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("Failed to save property:\n" + (err.error || `Server error ${res.status}`));
+        return;
+      }
       closeModal();
       await fetchProperties();
     } else {
@@ -555,6 +561,11 @@ async function saveProperty(e) {
         body: JSON.stringify(payload),
       });
       if (!res) return;
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("Failed to save property:\n" + (err.error || `Server error ${res.status}`));
+        return;
+      }
       const data = await res.json();
       closeModal();
       await fetchProperties();
@@ -562,9 +573,11 @@ async function saveProperty(e) {
         showMatchBanner(data.buyer_matches, data.property);
       }
     }
+  } catch (err) {
+    alert("Unexpected error saving property: " + err.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Save Property";
+    btn.textContent = "Save";
   }
 }
 
