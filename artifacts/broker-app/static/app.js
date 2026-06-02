@@ -205,6 +205,7 @@ async function fetchProperties() {
   renderTable(allProperties);
   renderMobileList(allProperties);
   updateStats();
+  renderClients();
 }
 
 function updateStats() {
@@ -529,7 +530,7 @@ async function saveProperty(e) {
       closeModal();
       await fetchProperties();
       if (data.buyer_matches && data.buyer_matches.length > 0) {
-        showBuyerMatchModal(data.buyer_matches, data.property);
+        showMatchBanner(data.buyer_matches, data.property);
       }
     }
   } finally {
@@ -647,6 +648,31 @@ function showBuyerMatchModal(buyers, prop) {
 
 function closeBuyerMatchModal() {
   document.getElementById("buyerMatchModal").classList.remove("open");
+}
+
+// ─── Match Banner ─────────────────────────────────────────────────────────────
+
+let _bannerMatchData = null;
+
+function showMatchBanner(matches, prop) {
+  _bannerMatchData = { matches, prop };
+  const n = matches.length;
+  document.getElementById("matchBannerText").textContent =
+    `New property matches ${n} client${n !== 1 ? "s" : ""} — tap to view`;
+  const el = document.getElementById("matchBanner");
+  el.style.animation = "none";
+  el.style.display = "flex";
+  requestAnimationFrame(() => { el.style.animation = ""; });
+}
+
+function dismissMatchBanner() {
+  document.getElementById("matchBanner").style.display = "none";
+  _bannerMatchData = null;
+}
+
+function showBannerBuyerDetails() {
+  if (!_bannerMatchData) return;
+  showBuyerMatchModal(_bannerMatchData.matches, _bannerMatchData.prop);
 }
 
 // ─── AI Matcher ───────────────────────────────────────────────────────────────
@@ -768,7 +794,6 @@ function setClientFilter(btn, filter) {
 }
 
 function getClientMatches(c) {
-  if (c.status !== "Looking") return [];
   return _matchPropertiesForClient(c);
 }
 
@@ -805,11 +830,9 @@ function renderClients() {
     return;
   }
   list.innerHTML = filtered.map(c => {
-    const matches = getClientMatches(c);
-    const matchBadge = c.status === "Looking"
-      ? (matches.length > 0
-          ? `<button class="client-match-badge" onclick="event.stopPropagation(); showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
-          : `<span class="client-no-match">No matches</span>`)
+    const matches = _matchPropertiesForClient(c);
+    const matchBadge = matches.length > 0
+      ? `<button class="client-match-badge" onclick="event.stopPropagation(); showClientMatches(${c.id})">${matches.length} propert${matches.length !== 1 ? "ies" : "y"} match</button>`
       : "";
     const budgetText = (c.budget_min || c.budget_max)
       ? `${c.budget_min ? formatPrice(c.budget_min) : "Any"} – ${c.budget_max ? formatPrice(c.budget_max) : "Any"}`
@@ -859,7 +882,7 @@ function toggleClientCard(id) {
 function showClientMatches(id) {
   const c = allClients.find(x => x.id === id);
   if (!c) return;
-  const matches = getClientMatches(c);
+  const matches = _matchPropertiesForClient(c);
   document.getElementById("clientMatchTitle").textContent = `Matches for ${c.name}`;
   document.getElementById("clientMatchDesc").textContent = `${matches.length} available propert${matches.length !== 1 ? "ies" : "y"} match${matches.length === 1 ? "es" : ""} their requirements.`;
   document.getElementById("clientMatchList").innerHTML = matches.map(p => `
@@ -1324,7 +1347,7 @@ async function saveParsedProperty() {
     discardParsed();
     await fetchProperties();
     if (data.buyer_matches && data.buyer_matches.length > 0) {
-      showBuyerMatchModal(data.buyer_matches, data.property);
+      showMatchBanner(data.buyer_matches, data.property);
     }
   } catch (err) {
     btn.disabled = false;

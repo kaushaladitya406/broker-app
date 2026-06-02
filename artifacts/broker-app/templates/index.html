@@ -34,6 +34,15 @@
 
   <main>
 
+    <!-- Match Banner -->
+    <div id="matchBanner" class="match-banner" style="display:none">
+      <button class="match-banner-body" onclick="showBannerBuyerDetails()">
+        <span id="matchBannerText"></span>
+        <span class="match-banner-cta">Tap to view →</span>
+      </button>
+      <button class="match-banner-dismiss" onclick="dismissMatchBanner()" aria-label="Dismiss">✕</button>
+    </div>
+
     <!-- ─── DASHBOARD ───────────────────────────────── -->
     <div class="tab-panel active" id="panel-dashboard">
 

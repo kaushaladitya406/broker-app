@@ -482,6 +482,55 @@ td {
   border: 1px solid var(--border);
 }
 
+/* ─── Match Banner ──────────────────────────────────────────────────── */
+.match-banner {
+  position: fixed;
+  top: 52px;
+  left: 0; right: 0;
+  z-index: 190;
+  background: #1d4ed8;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18);
+  animation: bannerIn .25s ease;
+}
+.match-banner-body {
+  flex: 1;
+  background: none;
+  border: none;
+  color: #fff;
+  font: 500 13.5px/1.4 inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.match-banner-cta {
+  font-size: 12px;
+  opacity: .75;
+  white-space: nowrap;
+}
+.match-banner-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,.65);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+.match-banner-dismiss:hover { color: #fff; }
+@keyframes bannerIn {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
 /* ─── Buttons ───────────────────────────────────────────────────────── */
 .btn-primary {
   background: var(--primary);
