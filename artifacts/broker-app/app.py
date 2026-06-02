@@ -210,20 +210,44 @@ def index():
 # ─── Properties ──────────────────────────────────────────────────────────────
 
 def find_matching_buyers(user_id, prop):
+    """Return Looking clients whose requirements match the given property."""
     result = supa().table("clients").select("*").eq("user_id", user_id).eq("status", "Looking").execute()
     buyers = result.data or []
     matches = []
     for b in buyers:
         if b.get("property_type") and b["property_type"] != prop["property_type"]:
             continue
+        if b.get("configuration") and b["configuration"] != prop.get("configuration"):
+            continue
         if b.get("location") and b["location"].strip().lower() not in prop["location"].lower():
             continue
-        price = prop["price"]
+        price = float(prop["price"])
         if b.get("budget_min") and float(b["budget_min"]) > 0 and price < float(b["budget_min"]):
             continue
         if b.get("budget_max") and float(b["budget_max"]) > 0 and price > float(b["budget_max"]):
             continue
         matches.append(b)
+    return matches
+
+
+def find_matching_properties(user_id, client):
+    """Return Available properties that match the given client's requirements."""
+    result = supa().table("properties").select("*").eq("user_id", user_id).eq("status", "Available").execute()
+    props = [enrich_property(r) for r in (result.data or [])]
+    matches = []
+    for p in props:
+        if client.get("property_type") and client["property_type"] != p["property_type"]:
+            continue
+        if client.get("configuration") and client["configuration"] != p.get("configuration"):
+            continue
+        if client.get("location") and client["location"].strip().lower() not in p["location"].lower():
+            continue
+        price = float(p["price"])
+        if client.get("budget_min") and float(client["budget_min"]) > 0 and price < float(client["budget_min"]):
+            continue
+        if client.get("budget_max") and float(client["budget_max"]) > 0 and price > float(client["budget_max"]):
+            continue
+        matches.append(p)
     return matches
 
 
@@ -390,7 +414,9 @@ def add_client():
         "status": data.get("status", "New Lead"),
     }
     result = supa().table("clients").insert(row_data).execute()
-    return jsonify(result.data[0]), 201
+    client = result.data[0]
+    property_matches = find_matching_properties(uid, client)
+    return jsonify({"client": client, "property_matches": property_matches}), 201
 
 
 @app.route("/api/clients/<int:client_id>", methods=["PUT"])

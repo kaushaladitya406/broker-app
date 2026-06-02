@@ -715,6 +715,10 @@ function setClientFilter(btn, filter) {
 
 function getClientMatches(c) {
   if (c.status !== "Looking") return [];
+  return _matchPropertiesForClient(c);
+}
+
+function _matchPropertiesForClient(c) {
   return allProperties.filter(p => {
     if (p.status !== "Available") return false;
     if (c.property_type && p.property_type !== c.property_type) return false;
@@ -817,6 +821,23 @@ function showClientMatches(id) {
 }
 function closeClientMatchModal() { document.getElementById("clientMatchModal").classList.remove("open"); }
 
+function showNewClientMatchModal(client, properties) {
+  const n = properties.length;
+  document.getElementById("clientMatchTitle").textContent = `Matches for ${client.name}`;
+  document.getElementById("clientMatchDesc").textContent =
+    `${n} available propert${n !== 1 ? "ies" : "y"} match${n === 1 ? "es" : ""} their requirements.`;
+  document.getElementById("clientMatchList").innerHTML = properties.map(p => `
+    <div class="buyer-match-item">
+      <div>
+        <div style="font-weight:600;font-size:14px;">${p.configuration} ${p.property_type}</div>
+        <div style="font-size:13px;color:var(--text-2);">${p.location}</div>
+        <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${formatArea(p)} · ${formatPrice(p.price)} · ${p.status}</div>
+      </div>
+      ${client.phone ? `<a href="https://wa.me/${(client.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${client.name}! I have a property matching your requirements: ${p.configuration} ${p.property_type} in ${p.location}, ${formatArea(p)} at ${formatPrice(p.price)}. Interested?`)}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
+    </div>`).join("");
+  document.getElementById("clientMatchModal").classList.add("open");
+}
+
 function openAddClientModal() {
   editingClientId = null;
   document.getElementById("clientModalTitle").textContent = "Add Client";
@@ -878,11 +899,18 @@ async function saveClient(e) {
   try {
     if (editingClientId) {
       await apiFetch(`${API}/api/clients/${editingClientId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      closeAddClientModal();
+      await fetchClients();
     } else {
-      await apiFetch(`${API}/api/clients`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const res = await apiFetch(`${API}/api/clients`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      if (!res) return;
+      const data = await res.json();
+      closeAddClientModal();
+      await fetchClients();
+      if (data.property_matches && data.property_matches.length > 0) {
+        showNewClientMatchModal(data.client, data.property_matches);
+      }
     }
-    closeAddClientModal();
-    await fetchClients();
   } finally { btn.disabled = false; btn.textContent = "Save Client"; }
 }
 
