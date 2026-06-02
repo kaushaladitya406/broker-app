@@ -1,15 +1,26 @@
 import os
 import json
-import sqlite3
 import functools
-from datetime import date
-from flask import Flask, request, jsonify, render_template, g, session, redirect, url_for
+import re as _re
+from datetime import date, timedelta
+from flask import Flask, request, jsonify, render_template, session, redirect
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-change-me")
-DB_PATH = os.path.join(os.path.dirname(__file__), "broker.db")
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+app.permanent_session_lifetime = timedelta(hours=24)
 
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+
+from supabase import create_client
+
+def supa():
+    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+
+
+# ─── Asset versioning & cache headers ────────────────────────────────────────
 
 def _asset_version(filename):
     try:
@@ -23,6 +34,8 @@ def inject_asset_versions():
     return {
         "css_v": _asset_version("style.css"),
         "js_v": _asset_version("app.js"),
+        "supabase_url": SUPABASE_URL,
+        "supabase_anon_key": SUPABASE_ANON_KEY,
     }
 
 
@@ -34,8 +47,8 @@ def add_no_cache_for_static(response):
         response.headers["Expires"] = "0"
     return response
 
-BROKER_USERNAME = os.environ.get("BROKER_USERNAME", "admin")
-BROKER_PASSWORD = os.environ.get("BROKER_PASSWORD", "broker123")
+
+# ─── Constants ───────────────────────────────────────────────────────────────
 
 UNIT_TO_SQFT = {
     "Sq Ft": 1,
@@ -50,236 +63,22 @@ VALID_CONFIGS = ["1BHK", "2BHK", "3BHK", "4BHK+", "Shop/Office", "Plot", "Other"
 VALID_PROPERTY_STATUSES = ["Available", "Reserved", "Under Negotiation", "Sold", "Rented", "Withdrawn"]
 CLOSED_PROPERTY_STATUSES = ("Sold", "Rented")
 
+
 def to_sqft(value, unit):
     return round(float(value) * UNIT_TO_SQFT.get(unit, 1), 2)
 
 
-# ─── DB helpers ────────────────────────────────────────────────────────────────
-
-def get_db():
-    if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
-        g.db.row_factory = sqlite3.Row
-    return g.db
+def _resolve_closed_at(status, existing_closed_at):
+    if status in CLOSED_PROPERTY_STATUSES:
+        return existing_closed_at or date.today().isoformat()
+    return None
 
 
-@app.teardown_appcontext
-def close_db(exc):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
-
-
-SEED_PROPERTIES = [
-    ("Apartment", "Sector 17, Chandigarh",   "3BHK",       3,   "Marla",  6500000,  "Available"),
-    ("Apartment", "Phase 7, Mohali",          "2BHK",       2,   "Marla",  4200000,  "Available"),
-    ("House",     "Sector 8, Patiala",        "4BHK+",      4,   "Marla",  15000000, "Available"),
-    ("Apartment", "Urban Estate, Patiala",    "1BHK",       1,   "Marla",  1800000,  "Rented"),
-    ("Land",      "Sector 20, Panchkula",     "Plot",       10,  "Marla",  9500000,  "Available"),
-    ("Apartment", "Zirakpur",                 "2BHK",       2,   "Marla",  3800000,  "Available"),
-    ("Shop",      "Model Town, Ludhiana",     "Shop/Office",200, "Sq Ft",  8000000,  "Available"),
-    ("House",     "Nabha Road, Patiala",      "3BHK",       5,   "Marla",  5500000,  "Available"),
-    ("Apartment", "Sector 32, Chandigarh",    "2BHK",       2,   "Marla",  4800000,  "Reserved"),
-    ("House",     "Sector 11, Mohali",        "4BHK+",      1,   "Kanal",  22000000, "Available"),
-]
-
-
-def _seed_properties(db):
-    for prop_type, location, config, area_val, area_unit, price, status in SEED_PROPERTIES:
-        sqft = to_sqft(area_val, area_unit)
-        db.execute(
-            "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (prop_type, location, config, float(area_val), area_unit, sqft, float(price), status)
-        )
-    db.commit()
-
-
-def init_db():
-    db = sqlite3.connect(DB_PATH)
-    db.row_factory = sqlite3.Row
-
-    # Check current schema
-    existing_tables = [r[0] for r in db.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='properties'"
-    ).fetchall()]
-    existing_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()] if existing_tables else []
-
-    # Create properties table (new installs)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS properties (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            property_type TEXT NOT NULL,
-            location TEXT NOT NULL,
-            configuration TEXT NOT NULL DEFAULT 'Other',
-            area_value REAL NOT NULL DEFAULT 0,
-            area_unit TEXT NOT NULL DEFAULT 'Sq Ft',
-            size REAL NOT NULL DEFAULT 0,
-            price REAL NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Available',
-            closed_at TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-
-    if existing_cols and 'configuration' not in existing_cols:
-        # Old schema — add missing columns, clear stale seed data, re-seed
-        for stmt in [
-            "ALTER TABLE properties ADD COLUMN configuration TEXT DEFAULT 'Other'",
-            "ALTER TABLE properties ADD COLUMN area_value REAL DEFAULT 0",
-            "ALTER TABLE properties ADD COLUMN area_unit TEXT DEFAULT 'Sq Ft'",
-            "ALTER TABLE properties ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
-        ]:
-            try:
-                db.execute(stmt)
-            except Exception:
-                pass
-        db.execute("DELETE FROM properties")
-        _seed_properties(db)
-    elif not existing_cols:
-        # Fresh install — seed
-        _seed_properties(db)
-
-    # Notes migration for DBs that have configuration but not notes yet
-    current_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()]
-    if 'notes' not in current_cols:
-        try:
-            db.execute("ALTER TABLE properties ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
-        except Exception:
-            pass
-
-    # closed_at migration — tracks when a property was marked Sold/Rented
-    current_cols = [r[1] for r in db.execute("PRAGMA table_info(properties)").fetchall()]
-    if 'closed_at' not in current_cols:
-        try:
-            db.execute("ALTER TABLE properties ADD COLUMN closed_at TEXT")
-        except Exception:
-            pass
-    # Unconditional backfill so any Sold/Rented row missing a close date is repaired
-    try:
-        db.execute(
-            "UPDATE properties SET closed_at = date(created_at) "
-            "WHERE status IN ('Sold', 'Rented') AND (closed_at IS NULL OR closed_at = '')"
-        )
-    except Exception:
-        pass
-
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL DEFAULT ''
-        )
-    """)
-
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS inquiries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_name TEXT NOT NULL,
-            whatsapp_message TEXT NOT NULL,
-            matched_property_ids TEXT NOT NULL DEFAULT '[]',
-            notes TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'New',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS buyers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT NOT NULL,
-            property_type TEXT DEFAULT '',
-            location TEXT DEFAULT '',
-            budget_min REAL DEFAULT 0,
-            budget_max REAL DEFAULT 0,
-            notes TEXT DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS followups (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            client_name TEXT NOT NULL,
-            phone TEXT,
-            note TEXT NOT NULL,
-            reminder_date TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'Pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS clients (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            phone TEXT NOT NULL DEFAULT '',
-            property_type TEXT DEFAULT '',
-            location TEXT DEFAULT '',
-            budget_min REAL DEFAULT 0,
-            budget_max REAL DEFAULT 0,
-            configuration TEXT DEFAULT '',
-            notes TEXT DEFAULT '',
-            status TEXT NOT NULL DEFAULT 'New Lead',
-            date_added TEXT NOT NULL DEFAULT (date('now')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    # One-time migration: buyers → clients (Active), inquiries → clients (Inquiry)
-    migrated = db.execute("SELECT value FROM settings WHERE key='clients_v1'").fetchone()
-    if not migrated:
-        buyers_exist = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='buyers'").fetchone()
-        if buyers_exist:
-            for b in db.execute("SELECT * FROM buyers").fetchall():
-                db.execute(
-                    "INSERT INTO clients (name, phone, property_type, location, budget_min, budget_max, notes, status) "
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, 'Looking')",
-                    (b["name"], b["phone"] or "", b["property_type"] or "",
-                     b["location"] or "", float(b["budget_min"] or 0),
-                     float(b["budget_max"] or 0), b["notes"] or "")
-                )
-        inq_exist = db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='inquiries'").fetchone()
-        if inq_exist:
-            for inq in db.execute("SELECT * FROM inquiries").fetchall():
-                db.execute(
-                    "INSERT INTO clients (name, notes, status) VALUES (?, ?, 'New Lead')",
-                    (inq["client_name"], inq["notes"] or "")
-                )
-        db.execute(
-            "INSERT INTO settings (key, value) VALUES ('clients_v1', '1') "
-            "ON CONFLICT(key) DO UPDATE SET value='1'"
-        )
-
-    # One-time migration: legacy client status 'Closed' → 'Closed Lost'
-    status_migrated = db.execute("SELECT value FROM settings WHERE key='client_status_v2'").fetchone()
-    if not status_migrated:
-        db.execute("UPDATE clients SET status='Closed Lost' WHERE status='Closed'")
-        db.execute(
-            "INSERT INTO settings (key, value) VALUES ('client_status_v2', '1') "
-            "ON CONFLICT(key) DO UPDATE SET value='1'"
-        )
-
-    # One-time migration: rename client statuses to broker-friendly labels
-    status_v3 = db.execute("SELECT value FROM settings WHERE key='client_status_v3'").fetchone()
-    if not status_v3:
-        rename = {
-            "Active": "Looking",
-            "Inquiry": "New Lead",
-            "Deal In Progress": "Negotiating",
-            "Closed Won": "Deal Done",
-            "Closed Lost": "Not Interested",
-        }
-        for old, new in rename.items():
-            db.execute("UPDATE clients SET status=? WHERE status=?", (new, old))
-        db.execute(
-            "INSERT INTO settings (key, value) VALUES ('client_status_v3', '1') "
-            "ON CONFLICT(key) DO UPDATE SET value='1'"
-        )
-
-    # Add phone column to followups for existing databases
-    fu_cols = [r["name"] for r in db.execute("PRAGMA table_info(followups)").fetchall()]
-    if "phone" not in fu_cols:
-        db.execute("ALTER TABLE followups ADD COLUMN phone TEXT")
-
-    db.commit()
-    db.close()
+def enrich_property(p):
+    """Add backward-compat 'size' alias for area_sqft."""
+    if p:
+        p["size"] = p.get("area_sqft", 0)
+    return p
 
 
 # ─── Auth ────────────────────────────────────────────────────────────────────
@@ -287,7 +86,7 @@ def init_db():
 def login_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        if not session.get("logged_in"):
+        if not session.get("user_id"):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
             return redirect("/login")
@@ -295,21 +94,99 @@ def login_required(f):
     return decorated
 
 
+def current_user_id():
+    return session.get("user_id")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if session.get("logged_in"):
+    if session.get("user_id"):
         return redirect("/")
     error = None
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "").strip()
-        if username == BROKER_USERNAME and password == BROKER_PASSWORD:
-            session["logged_in"] = True
-            session["username"] = username
-            return redirect("/")
-        else:
-            error = "Invalid username or password."
+        try:
+            sb = supa()
+            response = sb.auth.sign_in_with_password({"email": email, "password": password})
+            user = response.user
+            if user:
+                session.permanent = True
+                session["user_id"] = user.id
+                session["user_email"] = user.email
+                meta = user.user_metadata or {}
+                session["user_name"] = meta.get("full_name") or email.split("@")[0]
+                return redirect("/")
+            else:
+                error = "Invalid email or password."
+        except Exception as e:
+            msg = str(e).lower()
+            if "invalid" in msg or "credentials" in msg or "password" in msg:
+                error = "Invalid email or password."
+            elif "email not confirmed" in msg:
+                error = "Please confirm your email address first, then try logging in."
+            else:
+                error = "Login failed. Please try again."
     return render_template("login.html", error=error)
+
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if session.get("user_id"):
+        return redirect("/")
+    error = None
+    success = None
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "").strip()
+        if not name or not email or not password:
+            error = "All fields are required."
+        elif len(password) < 6:
+            error = "Password must be at least 6 characters."
+        else:
+            try:
+                sb = supa()
+                response = sb.auth.sign_up({
+                    "email": email,
+                    "password": password,
+                    "options": {"data": {"full_name": name}},
+                })
+                user = response.user
+                if user:
+                    success = "Account created! You can now sign in."
+                else:
+                    error = "Signup failed. Please try again."
+            except Exception as e:
+                msg = str(e).lower()
+                if "already" in msg or "exists" in msg or "registered" in msg:
+                    error = "An account with this email already exists."
+                else:
+                    error = f"Signup failed: {str(e)}"
+    return render_template("signup.html", error=error, success=success)
+
+
+@app.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    sent = False
+    error = None
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        if not email:
+            error = "Please enter your email address."
+        else:
+            try:
+                redirect_url = request.url_root.rstrip("/") + "/reset-password"
+                supa().auth.reset_password_for_email(email, {"redirect_to": redirect_url})
+                sent = True
+            except Exception as e:
+                error = f"Could not send reset email: {str(e)}"
+    return render_template("forgot_password.html", sent=sent, error=error)
+
+
+@app.route("/reset-password")
+def reset_password():
+    return render_template("reset_password.html")
 
 
 @app.route("/logout")
@@ -318,28 +195,33 @@ def logout():
     return redirect("/login")
 
 
-# ─── Pages ──────────────────────────────────────────────────────────────────
+# ─── Pages ───────────────────────────────────────────────────────────────────
 
 @app.route("/")
 @login_required
 def index():
-    return render_template("index.html", username=session.get("username", ""))
+    return render_template(
+        "index.html",
+        user_email=session.get("user_email", ""),
+        user_name=session.get("user_name", ""),
+    )
 
 
-# ─── Properties ─────────────────────────────────────────────────────────────
+# ─── Properties ──────────────────────────────────────────────────────────────
 
-def find_matching_buyers(db, prop):
-    buyers = [dict(r) for r in db.execute("SELECT * FROM clients WHERE status='Looking' ORDER BY created_at DESC").fetchall()]
+def find_matching_buyers(user_id, prop):
+    result = supa().table("clients").select("*").eq("user_id", user_id).eq("status", "Looking").execute()
+    buyers = result.data or []
     matches = []
     for b in buyers:
-        if b["property_type"] and b["property_type"] != prop["property_type"]:
+        if b.get("property_type") and b["property_type"] != prop["property_type"]:
             continue
-        if b["location"] and b["location"].strip().lower() not in prop["location"].lower():
+        if b.get("location") and b["location"].strip().lower() not in prop["location"].lower():
             continue
         price = prop["price"]
-        if b["budget_min"] and b["budget_min"] > 0 and price < b["budget_min"]:
+        if b.get("budget_min") and float(b["budget_min"]) > 0 and price < float(b["budget_min"]):
             continue
-        if b["budget_max"] and b["budget_max"] > 0 and price > b["budget_max"]:
+        if b.get("budget_max") and float(b["budget_max"]) > 0 and price > float(b["budget_max"]):
             continue
         matches.append(b)
     return matches
@@ -348,36 +230,34 @@ def find_matching_buyers(db, prop):
 @app.route("/api/properties", methods=["GET"])
 @login_required
 def get_properties():
-    db = get_db()
+    uid = current_user_id()
     q = request.args.get("q", "").strip().lower()
     status_filter = request.args.get("status", "").strip()
     type_filter = request.args.get("type", "").strip()
     config_filter = request.args.get("config", "").strip()
 
-    sql = "SELECT * FROM properties WHERE 1=1"
-    params = []
+    result = supa().table("properties").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+    rows = result.data or []
 
     if q:
-        sql += " AND (LOWER(location) LIKE ? OR LOWER(property_type) LIKE ? OR LOWER(configuration) LIKE ?)"
-        params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
+        rows = [r for r in rows if
+                q in (r.get("location") or "").lower() or
+                q in (r.get("property_type") or "").lower() or
+                q in (r.get("configuration") or "").lower()]
     if status_filter:
-        sql += " AND status = ?"
-        params.append(status_filter)
+        rows = [r for r in rows if r.get("status") == status_filter]
     if type_filter:
-        sql += " AND property_type = ?"
-        params.append(type_filter)
+        rows = [r for r in rows if r.get("property_type") == type_filter]
     if config_filter:
-        sql += " AND configuration = ?"
-        params.append(config_filter)
+        rows = [r for r in rows if r.get("configuration") == config_filter]
 
-    sql += " ORDER BY created_at DESC"
-    rows = db.execute(sql, params).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return jsonify([enrich_property(r) for r in rows])
 
 
 @app.route("/api/properties", methods=["POST"])
 @login_required
 def add_property():
+    uid = current_user_id()
     data = request.get_json()
     required = ["property_type", "location", "configuration", "area_value", "area_unit", "price", "status"]
     if not all(k in data for k in required):
@@ -387,207 +267,93 @@ def add_property():
 
     sqft = to_sqft(data["area_value"], data["area_unit"])
     closed_at = date.today().isoformat() if data["status"] in CLOSED_PROPERTY_STATUSES else None
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO properties (property_type, location, configuration, area_value, area_unit, size, price, status, notes, closed_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (data["property_type"], data["location"], data["configuration"],
-         float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"], data.get("notes", ""), closed_at)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM properties WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    prop = dict(row)
-    buyer_matches = find_matching_buyers(db, prop)
+    row_data = {
+        "user_id": uid,
+        "property_type": data["property_type"],
+        "location": data["location"],
+        "configuration": data["configuration"],
+        "area_value": float(data["area_value"]),
+        "area_unit": data["area_unit"],
+        "area_sqft": sqft,
+        "price": float(data["price"]),
+        "status": data["status"],
+        "notes": data.get("notes", ""),
+        "closed_at": closed_at,
+    }
+    result = supa().table("properties").insert(row_data).execute()
+    prop = enrich_property(result.data[0])
+    buyer_matches = find_matching_buyers(uid, prop)
     return jsonify({"property": prop, "buyer_matches": buyer_matches}), 201
 
 
 @app.route("/api/properties/<int:prop_id>", methods=["DELETE"])
 @login_required
 def delete_property(prop_id):
-    db = get_db()
-    db.execute("DELETE FROM properties WHERE id = ?", (prop_id,))
-    db.commit()
+    uid = current_user_id()
+    supa().table("properties").delete().eq("id", prop_id).eq("user_id", uid).execute()
     return jsonify({"success": True})
 
 
 @app.route("/api/properties/<int:prop_id>", methods=["PUT"])
 @login_required
 def update_property(prop_id):
+    uid = current_user_id()
     data = request.get_json()
     if data.get("status") not in VALID_PROPERTY_STATUSES:
         return jsonify({"error": "Invalid status"}), 400
+
     sqft = to_sqft(data["area_value"], data["area_unit"])
-    db = get_db()
-    existing = db.execute("SELECT closed_at FROM properties WHERE id = ?", (prop_id,)).fetchone()
-    closed_at = _resolve_closed_at(data["status"], existing["closed_at"] if existing else None)
-    db.execute(
-        "UPDATE properties SET property_type=?, location=?, configuration=?, area_value=?, area_unit=?, size=?, price=?, status=?, notes=?, closed_at=? WHERE id=?",
-        (data["property_type"], data["location"], data["configuration"],
-         float(data["area_value"]), data["area_unit"], sqft,
-         float(data["price"]), data["status"], data.get("notes", ""), closed_at, prop_id)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
-    return jsonify(dict(row))
+    existing_result = supa().table("properties").select("closed_at").eq("id", prop_id).eq("user_id", uid).execute()
+    existing_closed = (existing_result.data[0].get("closed_at") if existing_result.data else None)
+    closed_at = _resolve_closed_at(data["status"], existing_closed)
 
-
-def _resolve_closed_at(status, existing_closed_at):
-    """Set closed_at to today when newly Sold/Rented, preserve if already closed, clear otherwise."""
-    if status in CLOSED_PROPERTY_STATUSES:
-        return existing_closed_at or date.today().isoformat()
-    return None
+    update_data = {
+        "property_type": data["property_type"],
+        "location": data["location"],
+        "configuration": data["configuration"],
+        "area_value": float(data["area_value"]),
+        "area_unit": data["area_unit"],
+        "area_sqft": sqft,
+        "price": float(data["price"]),
+        "status": data["status"],
+        "notes": data.get("notes", ""),
+        "closed_at": closed_at,
+    }
+    result = supa().table("properties").update(update_data).eq("id", prop_id).eq("user_id", uid).execute()
+    return jsonify(enrich_property(result.data[0]))
 
 
 @app.route("/api/properties/<int:prop_id>/status", methods=["PATCH"])
 @login_required
 def update_property_status(prop_id):
+    uid = current_user_id()
     data = request.get_json()
     new_status = (data.get("status") or "").strip()
     if not new_status:
         return jsonify({"error": "status is required"}), 400
     if new_status not in VALID_PROPERTY_STATUSES:
         return jsonify({"error": "Invalid status"}), 400
-    db = get_db()
-    existing = db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone()
-    if not existing:
+
+    sb = supa()
+    existing_result = sb.table("properties").select("*").eq("id", prop_id).eq("user_id", uid).execute()
+    if not existing_result.data:
         return jsonify({"error": "Property not found"}), 404
+    existing = existing_result.data[0]
 
     linked_client = None
     link_client_id = data.get("link_client_id")
     if link_client_id and new_status in CLOSED_PROPERTY_STATUSES:
-        crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
-        if not crow:
+        crow_result = sb.table("clients").select("*").eq("id", link_client_id).eq("user_id", uid).execute()
+        if not crow_result.data:
             return jsonify({"error": "Linked client not found"}), 404
-        db.execute("UPDATE clients SET status='Deal Done' WHERE id=?", (link_client_id,))
-        crow = db.execute("SELECT * FROM clients WHERE id=?", (link_client_id,)).fetchone()
-        linked_client = dict(crow) if crow else None
+        sb.table("clients").update({"status": "Deal Done"}).eq("id", link_client_id).eq("user_id", uid).execute()
+        updated = sb.table("clients").select("*").eq("id", link_client_id).execute()
+        linked_client = updated.data[0] if updated.data else None
 
-    closed_at = _resolve_closed_at(new_status, existing["closed_at"])
-    db.execute("UPDATE properties SET status=?, closed_at=? WHERE id=?", (new_status, closed_at, prop_id))
-    db.commit()
-    prop = dict(db.execute("SELECT * FROM properties WHERE id = ?", (prop_id,)).fetchone())
+    closed_at = _resolve_closed_at(new_status, existing.get("closed_at"))
+    result = sb.table("properties").update({"status": new_status, "closed_at": closed_at}).eq("id", prop_id).eq("user_id", uid).execute()
+    prop = enrich_property(result.data[0])
     return jsonify({"property": prop, "linked_client": linked_client})
-
-
-# ─── Inquiries ──────────────────────────────────────────────────────────────
-
-@app.route("/api/inquiries", methods=["GET"])
-@login_required
-def get_inquiries():
-    db = get_db()
-    status_filter = request.args.get("status", "").strip()
-    sql = "SELECT * FROM inquiries WHERE 1=1"
-    params = []
-    if status_filter:
-        sql += " AND status = ?"
-        params.append(status_filter)
-    sql += " ORDER BY created_at DESC"
-    rows = db.execute(sql, params).fetchall()
-    result = []
-    for r in rows:
-        row = dict(r)
-        row["matched_property_ids"] = json.loads(row["matched_property_ids"])
-        result.append(row)
-    return jsonify(result)
-
-
-@app.route("/api/inquiries", methods=["POST"])
-@login_required
-def add_inquiry():
-    data = request.get_json()
-    if not all(k in data for k in ["client_name", "whatsapp_message"]):
-        return jsonify({"error": "Missing required fields"}), 400
-    matched_ids = json.dumps(data.get("matched_property_ids", []))
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO inquiries (client_name, whatsapp_message, matched_property_ids, notes, status) VALUES (?, ?, ?, ?, ?)",
-        (data["client_name"], data["whatsapp_message"], matched_ids,
-         data.get("notes", ""), data.get("status", "New"))
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM inquiries WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    result = dict(row)
-    result["matched_property_ids"] = json.loads(result["matched_property_ids"])
-    return jsonify(result), 201
-
-
-@app.route("/api/inquiries/<int:inq_id>", methods=["DELETE"])
-@login_required
-def delete_inquiry(inq_id):
-    db = get_db()
-    db.execute("DELETE FROM inquiries WHERE id = ?", (inq_id,))
-    db.commit()
-    return jsonify({"success": True})
-
-
-@app.route("/api/inquiries/<int:inq_id>", methods=["PUT"])
-@login_required
-def update_inquiry(inq_id):
-    data = request.get_json()
-    db = get_db()
-    db.execute(
-        "UPDATE inquiries SET client_name=?, notes=?, status=? WHERE id=?",
-        (data["client_name"], data.get("notes", ""), data["status"], inq_id)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM inquiries WHERE id = ?", (inq_id,)).fetchone()
-    result = dict(row)
-    result["matched_property_ids"] = json.loads(result["matched_property_ids"])
-    return jsonify(result)
-
-
-# ─── Buyers ─────────────────────────────────────────────────────────────────
-
-@app.route("/api/buyers", methods=["GET"])
-@login_required
-def get_buyers():
-    db = get_db()
-    rows = db.execute("SELECT * FROM buyers ORDER BY created_at DESC").fetchall()
-    return jsonify([dict(r) for r in rows])
-
-
-@app.route("/api/buyers", methods=["POST"])
-@login_required
-def add_buyer():
-    data = request.get_json()
-    if not data.get("name") or not data.get("phone"):
-        return jsonify({"error": "Name and phone are required"}), 400
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO buyers (name, phone, property_type, location, budget_min, budget_max, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (data["name"], data["phone"], data.get("property_type", ""),
-         data.get("location", ""), float(data.get("budget_min") or 0),
-         float(data.get("budget_max") or 0), data.get("notes", ""))
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM buyers WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
-
-
-@app.route("/api/buyers/<int:buyer_id>", methods=["DELETE"])
-@login_required
-def delete_buyer(buyer_id):
-    db = get_db()
-    db.execute("DELETE FROM buyers WHERE id = ?", (buyer_id,))
-    db.commit()
-    return jsonify({"success": True})
-
-
-@app.route("/api/buyers/<int:buyer_id>", methods=["PUT"])
-@login_required
-def update_buyer(buyer_id):
-    data = request.get_json()
-    db = get_db()
-    db.execute(
-        "UPDATE buyers SET name=?, phone=?, property_type=?, location=?, budget_min=?, budget_max=?, notes=? WHERE id=?",
-        (data["name"], data["phone"], data.get("property_type", ""),
-         data.get("location", ""), float(data.get("budget_min") or 0),
-         float(data.get("budget_max") or 0), data.get("notes", ""), buyer_id)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM buyers WHERE id = ?", (buyer_id,)).fetchone()
-    return jsonify(dict(row))
 
 
 # ─── Clients ─────────────────────────────────────────────────────────────────
@@ -595,115 +361,165 @@ def update_buyer(buyer_id):
 @app.route("/api/clients", methods=["GET"])
 @login_required
 def get_clients():
-    db = get_db()
+    uid = current_user_id()
     status_filter = request.args.get("status", "").strip()
-    sql = "SELECT * FROM clients WHERE 1=1"
-    params = []
+    query = supa().table("clients").select("*").eq("user_id", uid)
     if status_filter:
-        sql += " AND status = ?"
-        params.append(status_filter)
-    sql += " ORDER BY created_at DESC"
-    rows = db.execute(sql, params).fetchall()
-    return jsonify([dict(r) for r in rows])
+        query = query.eq("status", status_filter)
+    result = query.order("created_at", desc=True).execute()
+    return jsonify(result.data or [])
 
 
 @app.route("/api/clients", methods=["POST"])
 @login_required
 def add_client():
+    uid = current_user_id()
     data = request.get_json()
     if not data.get("name"):
         return jsonify({"error": "Name is required"}), 400
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO clients (name, phone, property_type, location, budget_min, budget_max, configuration, notes, status) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (data["name"], data.get("phone", ""), data.get("property_type", ""),
-         data.get("location", ""), float(data.get("budget_min") or 0),
-         float(data.get("budget_max") or 0), data.get("configuration", ""),
-         data.get("notes", ""), data.get("status", "New Lead"))
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM clients WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
+    row_data = {
+        "user_id": uid,
+        "name": data["name"],
+        "phone": data.get("phone", ""),
+        "property_type": data.get("property_type", ""),
+        "location": data.get("location", ""),
+        "budget_min": float(data.get("budget_min") or 0),
+        "budget_max": float(data.get("budget_max") or 0),
+        "configuration": data.get("configuration", ""),
+        "notes": data.get("notes", ""),
+        "status": data.get("status", "New Lead"),
+    }
+    result = supa().table("clients").insert(row_data).execute()
+    return jsonify(result.data[0]), 201
 
 
 @app.route("/api/clients/<int:client_id>", methods=["PUT"])
 @login_required
 def update_client(client_id):
+    uid = current_user_id()
     data = request.get_json()
-    db = get_db()
-    db.execute(
-        "UPDATE clients SET name=?, phone=?, property_type=?, location=?, budget_min=?, budget_max=?, "
-        "configuration=?, notes=?, status=? WHERE id=?",
-        (data["name"], data.get("phone", ""), data.get("property_type", ""),
-         data.get("location", ""), float(data.get("budget_min") or 0),
-         float(data.get("budget_max") or 0), data.get("configuration", ""),
-         data.get("notes", ""), data["status"], client_id)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM clients WHERE id = ?", (client_id,)).fetchone()
-    return jsonify(dict(row))
+    update_data = {
+        "name": data["name"],
+        "phone": data.get("phone", ""),
+        "property_type": data.get("property_type", ""),
+        "location": data.get("location", ""),
+        "budget_min": float(data.get("budget_min") or 0),
+        "budget_max": float(data.get("budget_max") or 0),
+        "configuration": data.get("configuration", ""),
+        "notes": data.get("notes", ""),
+        "status": data["status"],
+    }
+    result = supa().table("clients").update(update_data).eq("id", client_id).eq("user_id", uid).execute()
+    return jsonify(result.data[0])
 
 
 @app.route("/api/clients/<int:client_id>", methods=["DELETE"])
 @login_required
 def delete_client(client_id):
-    db = get_db()
-    db.execute("DELETE FROM clients WHERE id = ?", (client_id,))
-    db.commit()
+    uid = current_user_id()
+    supa().table("clients").delete().eq("id", client_id).eq("user_id", uid).execute()
     return jsonify({"success": True})
 
 
-# ─── Follow-ups ─────────────────────────────────────────────────────────────
+# ─── Follow-ups ──────────────────────────────────────────────────────────────
 
 @app.route("/api/followups", methods=["GET"])
 @login_required
 def get_followups():
-    db = get_db()
-    rows = db.execute("SELECT * FROM followups ORDER BY reminder_date ASC, created_at DESC").fetchall()
-    return jsonify([dict(r) for r in rows])
+    uid = current_user_id()
+    result = supa().table("followups").select("*").eq("user_id", uid).order("reminder_date").execute()
+    return jsonify(result.data or [])
 
 
 @app.route("/api/followups", methods=["POST"])
 @login_required
 def add_followup():
+    uid = current_user_id()
     data = request.get_json()
     if not data.get("client_name") or not data.get("note") or not data.get("reminder_date"):
         return jsonify({"error": "client_name, note, and reminder_date are required"}), 400
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO followups (client_name, phone, note, reminder_date, status) VALUES (?, ?, ?, ?, ?)",
-        (data["client_name"], data.get("phone", ""), data["note"], data["reminder_date"], data.get("status", "Pending"))
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM followups WHERE id = ?", (cursor.lastrowid,)).fetchone()
-    return jsonify(dict(row)), 201
+    row_data = {
+        "user_id": uid,
+        "client_name": data["client_name"],
+        "phone": data.get("phone", ""),
+        "note": data["note"],
+        "reminder_date": data["reminder_date"],
+        "status": data.get("status", "Pending"),
+    }
+    result = supa().table("followups").insert(row_data).execute()
+    return jsonify(result.data[0]), 201
 
 
 @app.route("/api/followups/<int:fu_id>", methods=["DELETE"])
 @login_required
 def delete_followup(fu_id):
-    db = get_db()
-    db.execute("DELETE FROM followups WHERE id = ?", (fu_id,))
-    db.commit()
+    uid = current_user_id()
+    supa().table("followups").delete().eq("id", fu_id).eq("user_id", uid).execute()
     return jsonify({"success": True})
 
 
 @app.route("/api/followups/<int:fu_id>", methods=["PUT"])
 @login_required
 def update_followup(fu_id):
+    uid = current_user_id()
     data = request.get_json()
-    db = get_db()
-    db.execute(
-        "UPDATE followups SET client_name=?, phone=?, note=?, reminder_date=?, status=? WHERE id=?",
-        (data["client_name"], data.get("phone", ""), data["note"], data["reminder_date"], data["status"], fu_id)
-    )
-    db.commit()
-    row = db.execute("SELECT * FROM followups WHERE id = ?", (fu_id,)).fetchone()
-    return jsonify(dict(row))
+    update_data = {
+        "client_name": data["client_name"],
+        "phone": data.get("phone", ""),
+        "note": data["note"],
+        "reminder_date": data["reminder_date"],
+        "status": data["status"],
+    }
+    result = supa().table("followups").update(update_data).eq("id", fu_id).eq("user_id", uid).execute()
+    return jsonify(result.data[0])
 
 
-# ─── AI Parse Property ──────────────────────────────────────────────────────
+# ─── Profile / Settings ───────────────────────────────────────────────────────
+
+@app.route("/api/profile", methods=["GET"])
+@login_required
+def get_profile():
+    uid = current_user_id()
+    result = supa().table("profiles").select("*").eq("id", uid).execute()
+    if result.data:
+        p = result.data[0]
+        return jsonify({
+            "broker_name": p.get("full_name", ""),
+            "broker_phone": p.get("phone", ""),
+            "broker_tagline": p.get("tagline", ""),
+            "email": session.get("user_email", ""),
+        })
+    return jsonify({"broker_name": "", "broker_phone": "", "broker_tagline": "", "email": session.get("user_email", "")})
+
+
+@app.route("/api/settings", methods=["GET"])
+@login_required
+def get_settings():
+    return get_profile()
+
+
+@app.route("/api/settings", methods=["PUT"])
+@login_required
+def update_settings():
+    uid = current_user_id()
+    data = request.get_json()
+    update_data = {
+        "full_name": data.get("broker_name", ""),
+        "phone": data.get("broker_phone", ""),
+        "tagline": data.get("broker_tagline", ""),
+    }
+    supa().table("profiles").upsert({"id": uid, **update_data}).execute()
+    if update_data["full_name"]:
+        session["user_name"] = update_data["full_name"]
+    return jsonify({
+        "broker_name": update_data["full_name"],
+        "broker_phone": update_data["phone"],
+        "broker_tagline": update_data["tagline"],
+        "email": session.get("user_email", ""),
+    })
+
+
+# ─── AI Parse Property ────────────────────────────────────────────────────────
 
 @app.route("/api/parse-property", methods=["POST"])
 @login_required
@@ -778,30 +594,22 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
     raw = response.choices[0].message.content.strip()
 
     def extract_json(text):
-        """Try every strategy to get a dict out of an AI response string."""
-        # 1. Direct parse
         try:
             return json.loads(text)
         except json.JSONDecodeError:
             pass
-
-        # 2. Strip markdown code fences  (```json ... ``` or ``` ... ```)
-        stripped = re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=re.IGNORECASE)
-        stripped = re.sub(r'\s*```$', '', stripped.strip())
+        stripped = _re.sub(r'^```(?:json)?\s*', '', text.strip(), flags=_re.IGNORECASE)
+        stripped = _re.sub(r'\s*```$', '', stripped.strip())
         try:
             return json.loads(stripped)
         except json.JSONDecodeError:
             pass
-
-        # 3. Find the outermost { ... } block (handles text before/after JSON)
-        brace_match = re.search(r'\{[\s\S]*\}', text)
+        brace_match = _re.search(r'\{[\s\S]*\}', text)
         if brace_match:
             try:
                 return json.loads(brace_match.group())
             except json.JSONDecodeError:
                 pass
-
-        # 4. Find first { and last } and try the slice
         start = text.find('{')
         end = text.rfind('}')
         if start != -1 and end != -1 and end > start:
@@ -809,14 +617,10 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
                 return json.loads(text[start:end + 1])
             except json.JSONDecodeError:
                 pass
-
         return None
 
     result = extract_json(raw)
     if result is None:
-        # Build a best-effort result from what we know (the input text) so the
-        # broker is never left with a hard error — they can correct fields manually.
-        print(f"[parse-property] Failed to parse AI response: {raw[:300]}")
         return jsonify({
             "error": "AI returned an unexpected format. Please check the fields below and correct any blanks.",
             "raw": raw[:500],
@@ -830,9 +634,8 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
             "notes": "",
             "assumptions": "Could not auto-extract — please fill in manually.",
             "size_sqft": 0,
-        }), 200  # 200 so the frontend shows the editable card rather than an alert
+        }), 200
 
-    # Validate and sanitise
     valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}
     if result.get("property_type") not in valid_types:
         result["property_type"] = "Apartment"
@@ -843,38 +646,34 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
     if result.get("status") not in {"Available", "Rented", "Sold", "Reserved"}:
         result["status"] = "Available"
 
-    # Guarantee area_value is a usable number
     try:
         result["area_value"] = float(result["area_value"]) if result.get("area_value") else 0.0
     except (TypeError, ValueError):
         result["area_value"] = 0.0
 
-    # Round price to a clean integer (eliminates floating-point drift like 7000003.2)
     try:
         result["price"] = int(round(float(result.get("price", 0))))
     except (TypeError, ValueError):
         result["price"] = 0
 
-    # Map "features" → "notes" for the property notes field
     result["notes"] = result.pop("features", "") or ""
-
     result["size_sqft"] = to_sqft(result["area_value"], result.get("area_unit", "Sq Ft"))
     return jsonify(result)
 
 
-# ─── AI Match ───────────────────────────────────────────────────────────────
+# ─── AI Match ────────────────────────────────────────────────────────────────
 
 @app.route("/api/match", methods=["POST"])
 @login_required
 def match_properties():
+    uid = current_user_id()
     data = request.get_json()
     message = data.get("message", "").strip()
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
-    db = get_db()
-    rows = db.execute("SELECT * FROM properties ORDER BY created_at DESC").fetchall()
-    inventory = [dict(r) for r in rows]
+    result = supa().table("properties").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+    inventory = [enrich_property(r) for r in (result.data or [])]
 
     if not inventory:
         return jsonify({"matches": [], "summary": "No properties in inventory to match against."})
@@ -882,20 +681,20 @@ def match_properties():
     def area_display(p):
         v = p.get("area_value", 0)
         u = p.get("area_unit", "Sq Ft")
-        sqft = p.get("size", 0)
+        sqft = p.get("area_sqft", 0)
         if u == "Sq Ft":
             return f"{v:g} Sq Ft"
         return f"{v:g} {u} ({sqft:g} Sq Ft)"
 
     inventory_text = "\n".join([
-        f"ID {p['id']}: {p['configuration']} {p['property_type']} in {p['location']}, "
+        f"ID {p['id']}: {p.get('configuration','')} {p['property_type']} in {p['location']}, "
         f"{area_display(p)}, Rs {p['price']:,.0f}, Status: {p['status']}"
         + (f", Features: {p['notes']}" if p.get('notes') else "")
         for p in inventory
     ])
 
     from openai import OpenAI
-    client = OpenAI(
+    ai_client = OpenAI(
         base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
         api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
     )
@@ -913,7 +712,7 @@ Analyze the client's request and return a JSON object with:
 
 Return ONLY valid JSON, no markdown, no extra text."""
 
-    response = client.chat.completions.create(
+    response = ai_client.chat.completions.create(
         model="gpt-5-mini",
         max_completion_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
@@ -921,53 +720,27 @@ Return ONLY valid JSON, no markdown, no extra text."""
 
     raw = response.choices[0].message.content.strip()
     try:
-        result = json.loads(raw)
+        ai_result = json.loads(raw)
     except json.JSONDecodeError:
-        import re
-        json_match = re.search(r'\{.*\}', raw, re.DOTALL)
+        json_match = _re.search(r'\{.*\}', raw, _re.DOTALL)
         if json_match:
-            result = json.loads(json_match.group())
+            ai_result = json.loads(json_match.group())
         else:
-            result = {"matches": [], "summary": "Could not parse AI response."}
+            ai_result = {"matches": [], "summary": "Could not parse AI response."}
 
-    matched_ids = result.get("matches", [])
+    matched_ids = ai_result.get("matches", [])
     matched_props = [p for p in inventory if p["id"] in matched_ids]
     matched_props.sort(key=lambda p: matched_ids.index(p["id"]) if p["id"] in matched_ids else 999)
 
     return jsonify({
         "matches": matched_props,
         "matched_ids": matched_ids,
-        "summary": result.get("summary", ""),
+        "summary": ai_result.get("summary", ""),
     })
 
 
-# ─── Settings ────────────────────────────────────────────────────────────────
-
-@app.route("/api/settings", methods=["GET"])
-@login_required
-def get_settings():
-    db = get_db()
-    rows = db.execute("SELECT key, value FROM settings").fetchall()
-    return jsonify({r["key"]: r["value"] for r in rows})
-
-
-@app.route("/api/settings", methods=["PUT"])
-@login_required
-def update_settings():
-    data = request.get_json()
-    db = get_db()
-    for key in ["broker_name", "broker_phone", "broker_tagline"]:
-        db.execute(
-            "INSERT INTO settings (key, value) VALUES (?, ?) "
-            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-            (key, data.get(key, ""))
-        )
-    db.commit()
-    rows = db.execute("SELECT key, value FROM settings").fetchall()
-    return jsonify({r["key"]: r["value"] for r in rows})
-
+# ─── Startup ─────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    init_db()
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False)

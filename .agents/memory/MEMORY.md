@@ -1,0 +1,2 @@
+- [Supabase migration pattern](supabase-migration.md) — service role key for all DB ops; anon key only for client-side auth (reset page); profile trigger auto-creates on signup
+- [Iframe cache-busting](iframe-cache.md) — preview iframe aggressively caches JS/CSS; fix: mtime-based ?v= param + no-cache after_request headers on /static/ paths

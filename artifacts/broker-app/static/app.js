@@ -120,10 +120,12 @@ async function fetchSettings() {
   const res = await apiFetch(`${API}/api/settings`);
   if (!res) return;
   const data = await res.json();
-  brokerProfile = { broker_name: "", broker_phone: "", broker_tagline: "", ...data };
+  brokerProfile = { broker_name: "", broker_phone: "", broker_tagline: "", email: "", ...data };
   const nameEl = document.getElementById("settingName");
   const phoneEl = document.getElementById("settingPhone");
   const taglineEl = document.getElementById("settingTagline");
+  const emailEl = document.getElementById("settingEmail");
+  if (emailEl) emailEl.value = brokerProfile.email || "";
   if (nameEl) nameEl.value = brokerProfile.broker_name || "";
   if (phoneEl) phoneEl.value = brokerProfile.broker_phone || "";
   if (taglineEl) taglineEl.value = brokerProfile.broker_tagline || "";
