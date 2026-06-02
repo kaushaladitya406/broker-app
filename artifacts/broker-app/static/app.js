@@ -147,12 +147,15 @@ function updateSettingsPreview() {
   }
   if (!preview) return;
   if (name || phone) {
-    const contact = name && phone ? `${name}: ${phone}` : name || phone;
     preview.style.display = "block";
     if (placeholder) placeholder.style.display = "none";
+    const closingLines = ["─────────────────"];
+    if (name) closingLines.push(`*${name}*`);
+    if (phone) closingLines.push(`📞 ${phone}`);
+    if (tagline) closingLines.push(`_${tagline}_`);
     preview.innerHTML = `
-      <div class="settings-preview-label">Preview in WhatsApp share:</div>
-      <div class="settings-preview-text">Contact ${contact}${tagline ? `\n${tagline}` : ""}</div>
+      <div class="settings-preview-label">Closing block in WhatsApp messages:</div>
+      <div class="settings-preview-text">${closingLines.join("\n")}</div>
     `;
   } else {
     preview.style.display = "none";
@@ -236,46 +239,89 @@ function configTag(config) {
 
 // ─── Share ────────────────────────────────────────────────────────────────────
 
-function buildShareText(p) {
-  const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
-  const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
-  const areaLine = (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
-    ? `${roundArea(p.area_value)} ${p.area_unit}`
-    : `${roundArea(p.size || p.area_value)} Sq Ft`;
-  const n = Number(p.price);
-  const priceFormatted = n >= 10000000
-    ? `Rs ${(n / 10000000).toFixed(2).replace(/\.?0+$/, "")} Cr`
-    : n >= 100000
-    ? `Rs ${(n / 100000).toFixed(2).replace(/\.?0+$/, "")} Lakh`
-    : `Rs ${n.toLocaleString("en-IN")}`;
-  const emoji = typeEmoji[p.property_type] || "🏘️";
+function toTitleCase(str) {
+  const minor = new Set(["and", "or", "the", "of", "in", "at", "by", "for", "near", "with", "to", "from"]);
+  return (str || "").split(/\s+/).map((w, i) => {
+    const lower = w.toLowerCase();
+    return (i === 0 || !minor.has(lower))
+      ? w.charAt(0).toUpperCase() + w.slice(1)
+      : lower;
+  }).join(" ");
+}
 
-  const lines = [
-    `${emoji} *${p.configuration} ${p.property_type}*`,
-    `📍 ${p.location}`,
-    `📐 ${areaLine}`,
-    `💰 ${priceFormatted}`,
-    `${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
-  ];
-
-  if (p.notes && p.notes.trim()) {
-    lines.push(``, `📝 ${p.notes.trim()}`);
+function formatDualPrice(price) {
+  const n = Number(price);
+  if (n >= 10000000) {
+    const val = (n / 10000000).toFixed(2).replace(/\.?0+$/, "");
+    return `*${val} Cr* (Rs ${n.toLocaleString("en-IN")})`;
+  } else if (n >= 100000) {
+    const val = (n / 100000).toFixed(2).replace(/\.?0+$/, "");
+    return `*${val} Lakh* (Rs ${n.toLocaleString("en-IN")})`;
   }
+  return `*Rs ${n.toLocaleString("en-IN")}*`;
+}
 
-  lines.push(``);
-
+function buildBrokerBlock() {
   const name = brokerProfile.broker_name?.trim() || "";
   const phone = brokerProfile.broker_phone?.trim() || "";
   const tagline = brokerProfile.broker_tagline?.trim() || "";
+  const lines = ["─────────────────"];
+  if (name) lines.push(`*${name}*`);
+  if (phone) lines.push(`📞 ${phone}`);
+  if (tagline) lines.push(`_${tagline}_`);
+  if (!name && !phone) lines.push(`📞 _Contact for details_`);
+  return lines;
+}
 
-  if (name || phone) {
-    const contact = name && phone ? `${name}: ${phone}` : name || phone;
-    lines.push(`📞 Contact ${contact}`);
-    if (tagline) lines.push(`_${tagline}_`);
-  } else {
-    lines.push(`_Contact us for details_ 📞`);
+function _propAreaLine(p) {
+  if (p.area_value && p.area_unit && p.area_unit !== "Sq Ft")
+    return `${roundArea(p.area_value)} ${p.area_unit}`;
+  return `${roundArea(p.size || p.area_sqft || p.area_value || 0)} Sq Ft`;
+}
+
+function buildShareText(p) {
+  const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
+  const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
+  const listingType = p.status === "Rented" ? "for Rent" : "for Sale";
+  const emoji = typeEmoji[p.property_type] || "🏘️";
+  const config = p.configuration ? `${p.configuration} ` : "";
+
+  const lines = [
+    `${emoji} *${config}${p.property_type} ${listingType}*`,
+    ``,
+    `📍 ${toTitleCase(p.location)}`,
+    `Area: ${_propAreaLine(p)}`,
+    `Price: ${formatDualPrice(p.price)}`,
+    `Status: ${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
+  ];
+
+  if (p.notes && p.notes.trim()) {
+    lines.push(``, p.notes.trim());
   }
 
+  lines.push(``, ...buildBrokerBlock());
+  return lines.join("\n");
+}
+
+function buildMatchMessage(clientName, p) {
+  const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
+  const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
+  const listingType = p.status === "Rented" ? "for Rent" : "for Sale";
+  const emoji = typeEmoji[p.property_type] || "🏘️";
+  const config = p.configuration ? `${p.configuration} ` : "";
+
+  const lines = [
+    `Hi ${clientName}! I have a property matching your requirements.`,
+    ``,
+    `${emoji} *${config}${p.property_type} ${listingType}*`,
+    `📍 ${toTitleCase(p.location)}`,
+    `Area: ${_propAreaLine(p)}`,
+    `Price: ${formatDualPrice(p.price)}`,
+    `Status: ${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
+    ``,
+    `Are you interested? Please get in touch.`,
+    ``, ...buildBrokerBlock(),
+  ];
   return lines.join("\n");
 }
 
@@ -577,17 +623,25 @@ async function confirmLinkClient(skip) {
 
 function showBuyerMatchModal(buyers, prop) {
   const list = document.getElementById("buyerMatchList");
-  list.innerHTML = buyers.map(b => `
+  list.innerHTML = buyers.map(b => {
+    const waMsg = buildMatchMessage(b.name, prop);
+    const phoneDigits = (b.phone || "").replace(/\D/g, "");
+    const waHref = phoneDigits
+      ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(waMsg)}`
+      : null;
+    return `
     <div class="buyer-match-card">
-      <div class="buyer-match-name">${b.name} <span class="buyer-phone">${b.phone}</span></div>
+      <div class="buyer-match-name">${b.name} <span class="buyer-phone">${b.phone || ""}</span></div>
       <div class="buyer-match-detail">
         ${b.property_type ? `<span class="type-tag">${b.property_type}</span>` : ""}
-        ${b.location ? `${b.location}` : ""}
+        ${b.configuration ? `<span class="config-tag">${b.configuration}</span>` : ""}
+        ${b.location ? `${toTitleCase(b.location)}` : ""}
         ${(b.budget_min || b.budget_max) ? `${b.budget_min ? formatPrice(b.budget_min) : "Any"} – ${b.budget_max ? formatPrice(b.budget_max) : "Any"}` : ""}
       </div>
       ${b.notes ? `<div class="buyer-match-notes">${b.notes}</div>` : ""}
-    </div>
-  `).join("");
+      ${waHref ? `<a href="${waHref}" target="_blank" class="btn-wa" style="margin-top:8px;display:inline-block;">WhatsApp</a>` : ""}
+    </div>`;
+  }).join("");
   document.getElementById("buyerMatchModal").classList.add("open");
 }
 
@@ -815,7 +869,7 @@ function showClientMatches(id) {
         <div style="font-size:13px;color:var(--text-2);">${p.location}</div>
         <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${formatArea(p)} · ${formatPrice(p.price)} · ${p.status}</div>
       </div>
-      ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${c.name}! I have a property that matches your requirements: ${p.configuration} ${p.property_type} in ${p.location}, ${formatArea(p)} at ${formatPrice(p.price)}. Interested?`)}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
+      ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g, "")}?text=${encodeURIComponent(buildMatchMessage(c.name, p))}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
     </div>`).join("");
   document.getElementById("clientMatchModal").classList.add("open");
 }
@@ -833,7 +887,7 @@ function showNewClientMatchModal(client, properties) {
         <div style="font-size:13px;color:var(--text-2);">${p.location}</div>
         <div style="font-size:12px;color:var(--text-3);margin-top:4px;">${formatArea(p)} · ${formatPrice(p.price)} · ${p.status}</div>
       </div>
-      ${client.phone ? `<a href="https://wa.me/${(client.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(`Hi ${client.name}! I have a property matching your requirements: ${p.configuration} ${p.property_type} in ${p.location}, ${formatArea(p)} at ${formatPrice(p.price)}. Interested?`)}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
+      ${client.phone ? `<a href="https://wa.me/${(client.phone || "").replace(/\D/g, "")}?text=${encodeURIComponent(buildMatchMessage(client.name, p))}" target="_blank" class="btn-wa" style="flex-shrink:0;">WhatsApp</a>` : ""}
     </div>`).join("");
   document.getElementById("clientMatchModal").classList.add("open");
 }
