@@ -61,7 +61,11 @@ async function apiFetch(url, opts = {}) {
 }
 
 function formatPrice(n) {
-  return "Rs " + Number(n).toLocaleString("en-IN");
+  n = Number(n);
+  if (!n || isNaN(n) || n <= 0) return "—";
+  if (n >= 10000000) return "Rs " + (n / 10000000).toFixed(2).replace(/\.?0+$/, "") + " Cr";
+  if (n >= 100000) return "Rs " + (n / 100000).toFixed(2).replace(/\.?0+$/, "") + " Lakh";
+  return "Rs " + n.toLocaleString("en-IN");
 }
 
 // Parse broker price input: plain numbers, "80L"/"80 lakh", "1.5Cr"/"1.5 crore", commas
@@ -85,6 +89,18 @@ function formatPriceWords(n) {
   if (n >= 10000000) return "Rs " + (n / 10000000).toFixed(2).replace(/\.?0+$/, "") + " Cr";
   if (n >= 100000) return "Rs " + (n / 100000).toFixed(2).replace(/\.?0+$/, "") + " Lakh";
   return "Rs " + n.toLocaleString("en-IN");
+}
+
+function listingTypeBadge(t) {
+  return t === "For Rent"
+    ? `<span class="badge-for-rent">For Rent</span>`
+    : `<span class="badge-for-sale">For Sale</span>`;
+}
+
+function updatePriceLabel() {
+  const lt = document.getElementById("propListingType")?.value;
+  const label = document.getElementById("propPriceLabel");
+  if (label) label.textContent = lt === "For Rent" ? "Monthly Rent (Rs)" : "Price (Rs)";
 }
 
 // Live helper text below a price/budget input
@@ -195,10 +211,12 @@ async function fetchProperties() {
   const q = document.getElementById("searchInput").value;
   const status = document.getElementById("statusFilter").value;
   const type = document.getElementById("typeFilter").value;
+  const listingType = document.getElementById("listingTypeFilter")?.value || "";
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (status) params.set("status", status);
   if (type) params.set("type", type);
+  if (listingType) params.set("listing_type", listingType);
   const res = await apiFetch(`${API}/api/properties?${params}`);
   if (!res) return;
   allProperties = await res.json();
@@ -283,15 +301,18 @@ function _propAreaLine(p) {
 function buildShareText(p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
   const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
-  const listingType = p.status === "Rented" ? "for Rent" : "for Sale";
+  const listingType = p.listing_type === "For Rent" ? "for Rent" : "for Sale";
   const emoji = typeEmoji[p.property_type] || "🏘️";
   const config = p.configuration ? `${p.configuration} ` : "";
+  const areaStr = p.area_value
+    ? `${p.area_value % 1 === 0 ? p.area_value : p.area_value} ${p.area_unit || "Sq Ft"}`
+    : `${p.size || 0} Sq Ft`;
 
   const lines = [
     `${emoji} *${config}${p.property_type} ${listingType}*`,
     ``,
     `📍 ${toTitleCase(p.location)}`,
-    `Area: ${_propAreaLine(p)}`,
+    `Area: ${areaStr}`,
     `Price: ${formatDualPrice(p.price)}`,
     `Status: ${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
   ];
@@ -307,16 +328,19 @@ function buildShareText(p) {
 function buildMatchMessage(clientName, p) {
   const typeEmoji = { Apartment: "🏢", House: "🏠", Villa: "🏡", Shop: "🏪", Office: "🏗️", Land: "🌳", Warehouse: "🏭" };
   const statusEmoji = { Available: "✅", Reserved: "🔒", "Under Negotiation": "🤝", Sold: "❌", Rented: "🔑", Withdrawn: "🚫" };
-  const listingType = p.status === "Rented" ? "for Rent" : "for Sale";
+  const listingType = p.listing_type === "For Rent" ? "for Rent" : "for Sale";
   const emoji = typeEmoji[p.property_type] || "🏘️";
   const config = p.configuration ? `${p.configuration} ` : "";
+  const areaStr = p.area_value
+    ? `${p.area_value % 1 === 0 ? p.area_value : p.area_value} ${p.area_unit || "Sq Ft"}`
+    : `${p.size || p.area_sqft || 0} Sq Ft`;
 
   const lines = [
     `Hi ${clientName}! I have a property matching your requirements.`,
     ``,
     `${emoji} *${config}${p.property_type} ${listingType}*`,
     `📍 ${toTitleCase(p.location)}`,
-    `Area: ${_propAreaLine(p)}`,
+    `Area: ${areaStr}`,
     `Price: ${formatDualPrice(p.price)}`,
     `Status: ${statusEmoji[p.status] || "ℹ️"} ${p.status}`,
     ``,
@@ -384,7 +408,7 @@ function renderTable(props) {
     const hasNotes = p.notes && p.notes.trim();
     return `
     <tr class="prop-row">
-      <td data-label="Type"><span class="type-tag">${p.property_type}</span></td>
+      <td data-label="Type"><span class="type-tag">${p.property_type}</span><div style="margin-top:3px;">${listingTypeBadge(p.listing_type)}</div></td>
       <td data-label="Location">
         <span class="location-text">${p.location}</span>
         ${hasNotes ? `<button class="notes-toggle-btn" id="notes-toggle-${p.id}" onclick="toggleNotes(${p.id})" title="View notes & features">▾</button>` : ""}
@@ -431,7 +455,7 @@ function renderMobileList(props) {
             <div class="prop-mobile-line2">${line2}</div>
           </div>
           <div class="prop-mobile-right">
-            ${statusBadge(p.status)}
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">${listingTypeBadge(p.listing_type)}${statusBadge(p.status)}</div>
             <span class="prop-mobile-expand">▾</span>
           </div>
         </div>
@@ -461,9 +485,11 @@ function openAddModal() {
   editingId = null;
   document.getElementById("modalTitle").textContent = "Add Property";
   document.getElementById("propForm").reset();
+  document.getElementById("propListingType").value = "For Sale";
   document.getElementById("propAreaConversion").textContent = "";
   document.getElementById("propPriceConv").textContent = "";
   document.getElementById("propNotes").value = "";
+  updatePriceLabel();
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -479,9 +505,11 @@ function openEditModal(id) {
   document.getElementById("propAreaUnit").value = p.area_unit || "Sq Ft";
   document.getElementById("propPrice").value = p.price;
   document.getElementById("propStatus").value = p.status;
+  document.getElementById("propListingType").value = p.listing_type || "For Sale";
   document.getElementById("propNotes").value = p.notes || "";
   updateAreaConversion("propAreaValue", "propAreaUnit", "propAreaConversion");
   updatePriceConversion("propPrice", "propPriceConv");
+  updatePriceLabel();
   document.getElementById("propModal").classList.add("open");
 }
 
@@ -500,6 +528,7 @@ async function saveProperty(e) {
     area_unit: document.getElementById("propAreaUnit").value,
     price: parsePriceInput(document.getElementById("propPrice").value),
     status: document.getElementById("propStatus").value,
+    listing_type: document.getElementById("propListingType")?.value || "For Sale",
     notes: document.getElementById("propNotes").value.trim(),
   };
   if (isNaN(payload.price) || payload.price <= 0) {
@@ -1048,7 +1077,7 @@ function renderDashboard() {
           <div class="dash-recent-line1">${p.property_type} · ${p.location}</div>
           <div class="dash-recent-line2">${line2}</div>
         </div>
-        <div class="dash-recent-right">${statusBadge(p.status)}</div>
+        <div class="dash-recent-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">${listingTypeBadge(p.listing_type)}${statusBadge(p.status)}</div>
       </div>
     </div>`;
   }).join("")}</div>`;
@@ -1259,6 +1288,13 @@ function renderConfirmCard(p) {
       ${p.assumptions ? `<div class="confirm-assumption">${p.assumptions}</div>` : ""}
       <div class="confirm-fields">
         <div class="confirm-field">
+          <label>Listing Type</label>
+          <select id="confirmListingType">
+            <option value="For Sale" ${(p.listing_type || "For Sale") !== "For Rent" ? "selected" : ""}>For Sale</option>
+            <option value="For Rent" ${p.listing_type === "For Rent" ? "selected" : ""}>For Rent</option>
+          </select>
+        </div>
+        <div class="confirm-field">
           <label>Configuration</label>
           <select id="confirmConfig">
             ${CONFIGS.map(c => `<option ${c === p.configuration ? "selected" : ""}>${c}</option>`).join("")}
@@ -1327,6 +1363,7 @@ async function saveParsedProperty() {
     area_unit: document.getElementById("confirmAreaUnit").value,
     price: parsePriceInput(document.getElementById("confirmPrice").value),
     status: document.getElementById("confirmStatus").value,
+    listing_type: document.getElementById("confirmListingType")?.value || "For Sale",
     notes: document.getElementById("confirmNotes")?.value?.trim() || "",
   };
   if (!payload.location || isNaN(payload.area_value) || isNaN(payload.price)) {
@@ -1360,6 +1397,7 @@ async function saveParsedProperty() {
 document.getElementById("searchInput").addEventListener("input", fetchProperties);
 document.getElementById("statusFilter").addEventListener("change", fetchProperties);
 document.getElementById("typeFilter").addEventListener("change", fetchProperties);
+document.getElementById("listingTypeFilter").addEventListener("change", fetchProperties);
 document.getElementById("propForm").addEventListener("submit", saveProperty);
 document.getElementById("saveInquiryForm").addEventListener("submit", saveInquiry);
 document.getElementById("clientForm").addEventListener("submit", saveClient);

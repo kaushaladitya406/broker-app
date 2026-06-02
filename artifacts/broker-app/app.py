@@ -75,9 +75,11 @@ def _resolve_closed_at(status, existing_closed_at):
 
 
 def enrich_property(p):
-    """Add backward-compat 'size' alias for area_sqft."""
+    """Add backward-compat 'size' alias for area_sqft; default listing_type."""
     if p:
         p["size"] = p.get("area_sqft", 0)
+        if not p.get("listing_type"):
+            p["listing_type"] = "For Sale"
     return p
 
 
@@ -274,6 +276,9 @@ def get_properties():
         rows = [r for r in rows if r.get("property_type") == type_filter]
     if config_filter:
         rows = [r for r in rows if r.get("configuration") == config_filter]
+    listing_type_filter = request.args.get("listing_type", "").strip()
+    if listing_type_filter:
+        rows = [r for r in rows if (r.get("listing_type") or "For Sale") == listing_type_filter]
 
     return jsonify([enrich_property(r) for r in rows])
 
@@ -301,6 +306,7 @@ def add_property():
         "area_sqft": sqft,
         "price": float(data["price"]),
         "status": data["status"],
+        "listing_type": data.get("listing_type", "For Sale"),
         "notes": data.get("notes", ""),
         "closed_at": closed_at,
     }
@@ -340,6 +346,7 @@ def update_property(prop_id):
         "area_sqft": sqft,
         "price": float(data["price"]),
         "status": data["status"],
+        "listing_type": data.get("listing_type", "For Sale"),
         "notes": data.get("notes", ""),
         "closed_at": closed_at,
     }
@@ -684,6 +691,16 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
 
     result["notes"] = result.pop("features", "") or ""
     result["size_sqft"] = to_sqft(result["area_value"], result.get("area_unit", "Sq Ft"))
+    # Detect listing_type from keywords in original text
+    text_lower = text.lower()
+    rent_kws = ["for rent", "on rent", "kiraya", "per month", "monthly rent", "/month", "rent out", "to let"]
+    sale_kws = ["for sale", "on sale", "sale", "sell", "selling", "bikau", "bikna"]
+    if any(kw in text_lower for kw in rent_kws):
+        result["listing_type"] = "For Rent"
+    elif any(kw in text_lower for kw in sale_kws):
+        result["listing_type"] = "For Sale"
+    else:
+        result["listing_type"] = "For Rent" if result.get("status") == "Rented" else "For Sale"
     return jsonify(result)
 
 
@@ -713,7 +730,7 @@ def match_properties():
         return f"{v:g} {u} ({sqft:g} Sq Ft)"
 
     inventory_text = "\n".join([
-        f"ID {p['id']}: {p.get('configuration','')} {p['property_type']} in {p['location']}, "
+        f"ID {p['id']}: [{p.get('listing_type','For Sale')}] {p.get('configuration','')} {p['property_type']} in {p['location']}, "
         f"{area_display(p)}, Rs {p['price']:,.0f}, Status: {p['status']}"
         + (f", Features: {p['notes']}" if p.get('notes') else "")
         for p in inventory
@@ -735,6 +752,8 @@ Here is the current property inventory:
 Analyze the client's request and return a JSON object with:
 1. "matches": array of property IDs that best match the client's requirements (most relevant first, max 5)
 2. "summary": a brief natural-language explanation of what the client is looking for and why you selected these properties
+
+IMPORTANT: Each property is tagged [For Sale] or [For Rent]. If the client asks for rental/rent/kiraya/monthly, only match [For Rent] listings. If they ask to buy/purchase/sale/sell, only match [For Sale] listings. If listing type is unclear, include both.
 
 Return ONLY valid JSON, no markdown, no extra text."""
 

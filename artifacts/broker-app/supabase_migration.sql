@@ -25,10 +25,14 @@ create table if not exists public.properties (
   area_sqft      real not null default 0,
   price          real not null default 0,
   status         text not null default 'Available',
+  listing_type   text not null default 'For Sale',
   notes          text not null default '',
   closed_at      text,
   created_at     timestamptz not null default now()
 );
+
+-- Run this if the table already exists (adds listing_type to existing installs):
+alter table public.properties add column if not exists listing_type text not null default 'For Sale';
 
 -- ── 3. Clients ───────────────────────────────────────────────
 create table if not exists public.clients (

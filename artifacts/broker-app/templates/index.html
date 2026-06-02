@@ -132,6 +132,11 @@ or 'Shop Elante Mall Chandigarh 800sqft 45 lakh available'"></textarea>
             <option>Available</option><option>Reserved</option><option>Under Negotiation</option>
             <option>Sold</option><option>Rented</option><option>Withdrawn</option>
           </select>
+          <select id="listingTypeFilter" class="filter-select">
+            <option value="">All Listings</option>
+            <option value="For Sale">For Sale</option>
+            <option value="For Rent">For Rent</option>
+          </select>
         </div>
         <div id="propMobileList" class="prop-mobile-list"></div>
         <div class="table-wrap">
@@ -320,13 +325,22 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
     </div>
     <form id="propForm">
       <div class="modal-body">
-        <div class="form-group">
-          <label>Property Type</label>
-          <select id="propType" required>
-            <option value="" disabled selected>Select type...</option>
-            <option>Apartment</option><option>House</option><option>Villa</option>
-            <option>Office</option><option>Shop</option><option>Land</option><option>Warehouse</option>
-          </select>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Property Type</label>
+            <select id="propType" required>
+              <option value="" disabled selected>Select type...</option>
+              <option>Apartment</option><option>House</option><option>Villa</option>
+              <option>Office</option><option>Shop</option><option>Land</option><option>Warehouse</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Listing Type</label>
+            <select id="propListingType" required onchange="updatePriceLabel()">
+              <option value="For Sale">For Sale</option>
+              <option value="For Rent">For Rent</option>
+            </select>
+          </div>
         </div>
         <div class="form-group">
           <label>Location</label>
@@ -365,7 +379,7 @@ Example: 'Bhai, 2 BHK chahiye Mohali mein, budget 60-70 lakh, seedha available h
           <div class="area-conversion" id="propAreaConversion"></div>
         </div>
         <div class="form-group">
-          <label>Price (Rs)</label>
+          <label id="propPriceLabel">Price (Rs)</label>
           <input type="text" id="propPrice" inputmode="text" placeholder="e.g. 5000000 or 50L or 1.5Cr" required oninput="updatePriceConversion('propPrice','propPriceConv')" />
           <div class="area-conversion" id="propPriceConv"></div>
         </div>
