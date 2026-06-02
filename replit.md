@@ -53,6 +53,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 ## Gotchas
 
 - Always restart BrokerApp workflow after changes to app.py
+- Static assets (`/static/*.js`, `/static/*.css`) are cache-busted via `?v={{ css_v }}`/`?v={{ js_v }}` (file mtime, injected by `inject_asset_versions` context processor) AND served with `no-cache` headers via `add_no_cache_for_static` after_request. This is required because the preview iframe aggressively caches static JS/CSS — without it, frontend changes appear not to take effect
 - The SQLite DB is at `artifacts/broker-app/broker.db` — delete to reset
 - `init_db()` is called at server startup — schema auto-creates on first run; one-time migration moves buyers→clients(Active) and inquiries→clients(Inquiry) via settings key `clients_v1`
 - POST /api/properties returns `{property, buyer_matches}` — buyer_matches now queries clients WHERE status='Active'; frontend shows alert modal

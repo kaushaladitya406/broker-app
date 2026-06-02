@@ -8,6 +8,31 @@ from flask import Flask, request, jsonify, render_template, g, session, redirect
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-change-me")
 DB_PATH = os.path.join(os.path.dirname(__file__), "broker.db")
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+
+
+def _asset_version(filename):
+    try:
+        return int(os.path.getmtime(os.path.join(STATIC_DIR, filename)))
+    except OSError:
+        return 0
+
+
+@app.context_processor
+def inject_asset_versions():
+    return {
+        "css_v": _asset_version("style.css"),
+        "js_v": _asset_version("app.js"),
+    }
+
+
+@app.after_request
+def add_no_cache_for_static(response):
+    if request.path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
 BROKER_USERNAME = os.environ.get("BROKER_USERNAME", "admin")
 BROKER_PASSWORD = os.environ.get("BROKER_PASSWORD", "broker123")
