@@ -419,10 +419,10 @@ function renderTable(props) {
       <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
         <div class="actions-inner">
-          <button class="btn-share" onclick="shareProperty(${p.id}, this)" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
-          <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
-          <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
-          <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
+          <button class="btn-share" data-action="share" data-id="${p.id}" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
+          <button class="btn-action-pill btn-status" data-action="status" data-id="${p.id}" title="Change status">Status</button>
+          <button class="btn-action-pill btn-edit" data-action="edit" data-id="${p.id}" title="Edit">Edit</button>
+          <button class="btn-action-pill btn-delete" data-action="delete" data-id="${p.id}" title="Delete">Delete</button>
         </div>
       </td>
     </tr>
@@ -451,7 +451,7 @@ function renderMobileList(props) {
     const hasNotes = p.notes && p.notes.trim();
     return `
       <div class="prop-mobile-item" id="mobile-item-${p.id}">
-        <div class="prop-mobile-summary" onclick="toggleMobileRow(${p.id})">
+        <div class="prop-mobile-summary" data-toggle-id="${p.id}">
           <div class="prop-mobile-main">
             <div class="prop-mobile-line1">${p.property_type} · ${p.location}</div>
             <div class="prop-mobile-line2">${line2}</div>
@@ -464,10 +464,10 @@ function renderMobileList(props) {
         <div class="prop-mobile-detail" id="mobile-detail-${p.id}" style="display:none">
           ${hasNotes ? `<div class="prop-mobile-notes">📝 ${p.notes}</div>` : ""}
           <div class="prop-mobile-actions">
-            <button class="btn-share btn-share-row" onclick="shareProperty(${p.id}, this)">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
-            <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})">Status</button>
-            <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})">Edit</button>
-            <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})">Delete</button>
+            <button class="btn-share btn-share-row" data-action="share" data-id="${p.id}">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
+            <button class="btn-action-pill btn-status" data-action="status" data-id="${p.id}">Status</button>
+            <button class="btn-action-pill btn-edit" data-action="edit" data-id="${p.id}">Edit</button>
+            <button class="btn-action-pill btn-delete" data-action="delete" data-id="${p.id}">Delete</button>
           </div>
         </div>
       </div>`;
@@ -1427,6 +1427,46 @@ async function saveParsedProperty() {
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
+
+// ─── Inventory event delegation ───────────────────────────────────────────────
+// Using delegation (not inline onclick) so click/tap events reliably fire on
+// both desktop and mobile — inline handlers on dynamically injected innerHTML
+// can silently fail in some browsers and on iOS Safari.
+
+function _dispatchInventoryAction(action, id, btn) {
+  if (action === "share")  shareProperty(id, btn);
+  else if (action === "status") openQuickStatusModal(id);
+  else if (action === "edit")   openEditModal(id);
+  else if (action === "delete") deleteProperty(id);
+}
+
+(function setupInventoryListeners() {
+  // Desktop table body
+  const tbody = document.getElementById("propertiesBody");
+  if (tbody) {
+    tbody.addEventListener("click", function(e) {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      _dispatchInventoryAction(btn.dataset.action, btn.dataset.id, btn);
+    });
+  }
+
+  // Mobile list — row toggle + action buttons
+  const mobileList = document.getElementById("propMobileList");
+  if (mobileList) {
+    mobileList.addEventListener("click", function(e) {
+      // Action buttons take priority
+      const btn = e.target.closest("[data-action]");
+      if (btn) {
+        _dispatchInventoryAction(btn.dataset.action, btn.dataset.id, btn);
+        return;
+      }
+      // Row summary toggle
+      const summary = e.target.closest("[data-toggle-id]");
+      if (summary) toggleMobileRow(summary.dataset.toggleId);
+    });
+  }
+})();
 
 document.getElementById("searchInput").addEventListener("input", fetchProperties);
 document.getElementById("statusFilter").addEventListener("change", fetchProperties);
