@@ -165,7 +165,7 @@ function updateSettingsPreview() {
   if (name || phone) {
     preview.style.display = "block";
     if (placeholder) placeholder.style.display = "none";
-    const closingLines = ["─────────────────"];
+    const closingLines = ["───────────"];
     if (name) closingLines.push(`*${name}*`);
     if (phone) closingLines.push(`📞 ${phone}`);
     if (tagline) closingLines.push(`_${tagline}_`);
@@ -284,7 +284,7 @@ function buildBrokerBlock() {
   const name = brokerProfile.broker_name?.trim() || "";
   const phone = brokerProfile.broker_phone?.trim() || "";
   const tagline = brokerProfile.broker_tagline?.trim() || "";
-  const lines = ["─────────────────"];
+  const lines = ["───────────"];
   if (name) lines.push(`*${name}*`);
   if (phone) lines.push(`📞 ${phone}`);
   if (tagline) lines.push(`_${tagline}_`);
@@ -1328,7 +1328,7 @@ function renderConfirmCard(p) {
         <div class="confirm-field" style="grid-column:1/-1">
           <label>Area</label>
           <div class="area-input-row">
-            <input type="number" id="confirmAreaValue" min="0.01" step="0.01"
+            <input type="number" id="confirmAreaValue" value="${p.area_value > 0 ? p.area_value : ''}" min="0.01" step="0.01"
               oninput="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')"
               placeholder="e.g. 6"
             />
@@ -1341,7 +1341,7 @@ function renderConfirmCard(p) {
         </div>
         <div class="confirm-field">
           <label>Price (Rs)</label>
-          <input type="text" id="confirmPrice" inputmode="text" placeholder="e.g. 7000000 or 70L" oninput="updatePriceConversion('confirmPrice','confirmPriceConv')" />
+          <input type="text" id="confirmPrice" value="${p.price > 0 ? p.price : ''}" inputmode="text" placeholder="e.g. 7000000 or 70L" oninput="updatePriceConversion('confirmPrice','confirmPriceConv')" />
           <div class="area-conversion" id="confirmPriceConv"></div>
         </div>
         <div class="confirm-field">
