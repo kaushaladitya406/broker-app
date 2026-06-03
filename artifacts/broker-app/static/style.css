@@ -590,7 +590,8 @@ td {
 .btn-cancel:hover { border-color: var(--border-strong); color: var(--text); }
 
 /* ─── Action buttons ────────────────────────────────────────────────── */
-.actions-cell { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
+.actions-cell { white-space: nowrap; vertical-align: middle; }
+.actions-inner { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
 .btn-icon {
   border: none;
   background: none;

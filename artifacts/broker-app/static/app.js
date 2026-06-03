@@ -351,7 +351,7 @@ function buildMatchMessage(clientName, p) {
 }
 
 async function shareProperty(id, btn) {
-  const p = allProperties.find(x => x.id === id);
+  const p = allProperties.find(x => x.id == id);
   if (!p) return;
   const text = buildShareText(p);
   const label = btn.querySelector(".btn-action-label");
@@ -418,10 +418,12 @@ function renderTable(props) {
       <td data-label="Price">${formatPrice(p.price)}</td>
       <td data-label="Status">${statusBadge(p.status)}</td>
       <td class="actions-cell">
-        <button class="btn-share" onclick="shareProperty(${p.id}, this)" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
-        <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
-        <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
-        <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
+        <div class="actions-inner">
+          <button class="btn-share" onclick="shareProperty(${p.id}, this)" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
+          <button class="btn-action-pill btn-status" onclick="openQuickStatusModal(${p.id})" title="Change status">Status</button>
+          <button class="btn-action-pill btn-edit" onclick="openEditModal(${p.id})" title="Edit">Edit</button>
+          <button class="btn-action-pill btn-delete" onclick="deleteProperty(${p.id})" title="Delete">Delete</button>
+        </div>
       </td>
     </tr>
     ${hasNotes ? `
@@ -494,7 +496,7 @@ function openAddModal() {
 }
 
 function openEditModal(id) {
-  const p = allProperties.find(x => x.id === id);
+  const p = allProperties.find(x => x.id == id);
   if (!p) return;
   editingId = id;
   document.getElementById("modalTitle").textContent = "Edit Property";
@@ -593,7 +595,7 @@ let quickStatusPropId = null;
 let pendingStatusChange = null; // { propId, status } awaiting client link
 
 function openQuickStatusModal(id) {
-  const p = allProperties.find(x => x.id === id);
+  const p = allProperties.find(x => x.id == id);
   if (!p) return;
   quickStatusPropId = id;
   document.getElementById("quickStatusProp").innerHTML =
@@ -922,7 +924,7 @@ function toggleClientCard(id) {
 }
 
 function showClientMatches(id) {
-  const c = allClients.find(x => x.id === id);
+  const c = allClients.find(x => x.id == id);
   if (!c) return;
   const matches = _matchPropertiesForClient(c);
   document.getElementById("clientMatchTitle").textContent = `Matches for ${c.name}`;
@@ -968,7 +970,7 @@ function openAddClientModal() {
 }
 
 function openEditClientModal(id) {
-  const c = allClients.find(x => x.id === id);
+  const c = allClients.find(x => x.id == id);
   if (!c) return;
   editingClientId = id;
   document.getElementById("clientModalTitle").textContent = "Edit Client";
@@ -1183,7 +1185,7 @@ function openAddFollowupModal() {
 }
 
 function openEditFollowupModal(id) {
-  const f = allFollowups.find(x => x.id === id);
+  const f = allFollowups.find(x => x.id == id);
   if (!f) return;
   editingFollowupId = id;
   document.getElementById("followupModalTitle").textContent = "Edit Follow-up";
@@ -1220,7 +1222,7 @@ async function saveFollowup(e) {
 }
 
 async function markFollowupDone(id) {
-  const f = allFollowups.find(x => x.id === id);
+  const f = allFollowups.find(x => x.id == id);
   if (!f) return;
   await apiFetch(`${API}/api/followups/${id}`, {
     method: "PUT",
@@ -1326,7 +1328,7 @@ function renderConfirmCard(p) {
         <div class="confirm-field" style="grid-column:1/-1">
           <label>Area</label>
           <div class="area-input-row">
-            <input type="number" id="confirmAreaValue" value="${p.area_value > 0 ? p.area_value : ""}" min="0.01" step="0.01"
+            <input type="number" id="confirmAreaValue" min="0.01" step="0.01"
               oninput="updateAreaConversion('confirmAreaValue','confirmAreaUnit','confirmAreaConv')"
               placeholder="e.g. 6"
             />
@@ -1335,12 +1337,12 @@ function renderConfirmCard(p) {
               ${UNITS.map(u => `<option ${u === p.area_unit ? "selected" : ""}>${u}</option>`).join("")}
             </select>
           </div>
-          <div class="area-conversion" id="confirmAreaConv">${initSqft}</div>
+          <div class="area-conversion" id="confirmAreaConv"></div>
         </div>
         <div class="confirm-field">
           <label>Price (Rs)</label>
-          <input type="text" id="confirmPrice" value="${p.price > 0 ? p.price : ""}" inputmode="text" placeholder="e.g. 7000000 or 70L" oninput="updatePriceConversion('confirmPrice','confirmPriceConv')" />
-          <div class="area-conversion" id="confirmPriceConv">${p.price > 0 ? "≈ " + formatPriceWords(p.price) : ""}</div>
+          <input type="text" id="confirmPrice" inputmode="text" placeholder="e.g. 7000000 or 70L" oninput="updatePriceConversion('confirmPrice','confirmPriceConv')" />
+          <div class="area-conversion" id="confirmPriceConv"></div>
         </div>
         <div class="confirm-field">
           <label>Status</label>
@@ -1359,6 +1361,17 @@ function renderConfirmCard(p) {
       </div>
     </div>
   `;
+  // Explicitly set field values after DOM insertion so number inputs reliably show the parsed values
+  const areaEl = document.getElementById("confirmAreaValue");
+  if (areaEl && p.area_value > 0) {
+    areaEl.value = p.area_value;
+    updateAreaConversion("confirmAreaValue", "confirmAreaUnit", "confirmAreaConv");
+  }
+  const priceEl = document.getElementById("confirmPrice");
+  if (priceEl && p.price > 0) {
+    priceEl.value = p.price;
+    updatePriceConversion("confirmPrice", "confirmPriceConv");
+  }
 }
 
 function discardParsed() {

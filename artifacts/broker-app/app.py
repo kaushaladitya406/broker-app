@@ -233,8 +233,8 @@ def find_matching_buyers(user_id, prop):
 
 
 def find_matching_properties(user_id, client):
-    """Return Available properties that match the given client's requirements."""
-    result = supa().table("properties").select("*").eq("user_id", user_id).eq("status", "Available").execute()
+    """Return Available/Rented properties that match the given client's requirements."""
+    result = supa().table("properties").select("*").eq("user_id", user_id).in_("status", ["Available", "Rented"]).execute()
     props = [enrich_property(r) for r in (result.data or [])]
     matches = []
     for p in props:
@@ -737,7 +737,7 @@ def match_properties():
     if not message:
         return jsonify({"error": "No message provided"}), 400
 
-    result = supa().table("properties").select("*").eq("user_id", uid).order("created_at", desc=True).execute()
+    result = supa().table("properties").select("*").eq("user_id", uid).in_("status", ["Available", "Rented"]).order("created_at", desc=True).execute()
     inventory = [enrich_property(r) for r in (result.data or [])]
 
     if not inventory:
