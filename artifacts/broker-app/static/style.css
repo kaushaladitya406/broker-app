@@ -268,7 +268,7 @@ main { max-width: 1060px; margin: 0 auto; padding: 28px 24px 60px; }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 7px 11px;
-  font-size: 13.5px;
+  font-size: 16px;
   color: var(--text);
   background: var(--bg);
   outline: none;
@@ -590,7 +590,7 @@ td {
 .btn-cancel:hover { border-color: var(--border-strong); color: var(--text); }
 
 /* ─── Action buttons ────────────────────────────────────────────────── */
-.actions-cell { display: flex; gap: 4px; align-items: center; }
+.actions-cell { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; white-space: nowrap; }
 .btn-icon {
   border: none;
   background: none;
@@ -1001,19 +1001,19 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
-.form-group input, .form-group select {
+.form-group input, .form-group select, .form-group textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
 }
-.form-group input:focus, .form-group select:focus {
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(35,131,226,0.1);
 }
@@ -1080,7 +1080,7 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 8px 10px;
-  font-size: 14px;
+  font-size: 16px;
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
   background: var(--bg);
@@ -1172,18 +1172,19 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   color: var(--success);
   border: 1px solid #b7dfb7;
   border-radius: var(--radius-sm);
-  padding: 4px 10px;
+  padding: 6px 10px;
   cursor: pointer;
   font-family: inherit;
-  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1px;
+  display: inline-flex; flex-direction: row; align-items: center; justify-content: center;
+  gap: 5px;
   transition: all 0.12s;
+  white-space: nowrap;
 }
-.btn-share svg { display: block; }
-.btn-share .btn-action-label { font-size: 10px; font-weight: 600; line-height: 1; }
+.btn-share svg { display: block; flex-shrink: 0; }
+.btn-share .btn-action-label { font-size: 12px; font-weight: 600; line-height: 1; }
 .btn-share:hover { background: #d4edda; }
 .btn-share-copied { background: var(--success) !important; color: white !important; border-color: var(--success) !important; }
-/* Horizontal share variant for mobile action row */
+/* Horizontal share variant (kept for compatibility) */
 .btn-share-row { flex-direction: row; gap: 5px; padding: 6px 12px; }
 .btn-share-row .btn-action-label { font-size: 12px; }
 
@@ -1234,7 +1235,7 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 10px 12px;
-  font-size: 14px; font-family: inherit;
+  font-size: 16px; font-family: inherit;
   resize: vertical; min-height: 80px; outline: none;
   background: var(--bg); color: var(--text);
   margin-top: 14px;
@@ -1294,7 +1295,7 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
 }
 .confirm-field input, .confirm-field select {
   width: 100%; border: 1px solid var(--border);
-  border-radius: var(--radius-sm); padding: 7px 9px; font-size: 13.5px;
+  border-radius: var(--radius-sm); padding: 7px 9px; font-size: 16px;
   outline: none; background: var(--bg); color: var(--text);
   transition: border-color 0.12s; font-family: inherit;
 }

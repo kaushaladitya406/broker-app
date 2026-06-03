@@ -587,8 +587,7 @@ def parse_property():
 
     from openai import OpenAI
     client = OpenAI(
-        base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
-        api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
+        api_key=os.environ.get("OPENAI_API_KEY"),
     )
 
     units_list = ", ".join(VALID_UNITS)
@@ -640,7 +639,7 @@ Output: {{"property_type": "Apartment", "configuration": "3BHK", "location": "Se
 Return ONLY valid JSON. No markdown, no code blocks, no extra text before or after."""
 
     response = client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-4o-mini",
         max_completion_tokens=600,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -761,8 +760,7 @@ def match_properties():
 
     from openai import OpenAI
     ai_client = OpenAI(
-        base_url=os.environ.get("AI_INTEGRATIONS_OPENAI_BASE_URL"),
-        api_key=os.environ.get("AI_INTEGRATIONS_OPENAI_API_KEY"),
+        api_key=os.environ.get("OPENAI_API_KEY"),
     )
 
     prompt = f"""You are a real estate broker assistant in India. A client sent this WhatsApp message:
@@ -781,7 +779,7 @@ IMPORTANT: Each property is tagged [For Sale] or [For Rent]. If the client asks 
 Return ONLY valid JSON, no markdown, no extra text."""
 
     response = ai_client.chat.completions.create(
-        model="gpt-5-mini",
+        model="gpt-4o-mini",
         max_completion_tokens=1024,
         messages=[{"role": "user", "content": prompt}],
     )

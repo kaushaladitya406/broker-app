@@ -6,4 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "flask==3.1.0",
     "openai==1.84.0",
+    "pydantic>=2.13.4",
+    "pydantic-core>=2.46.4",
+    "supabase>=2.30.1",
 ]

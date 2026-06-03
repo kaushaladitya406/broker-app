@@ -24,13 +24,13 @@ args = "BrokerApp"
 name = "BrokerApp"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python artifacts/broker-app/app.py"
-waitForPort = 8000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python3.11 artifacts/broker-app/app.py"
+waitForPort = 8000
 
 [agent]
 stack = "PNPM_WORKSPACE"
@@ -58,3 +58,4 @@ externalPort = 3000
 
 [nix]
 channel = "stable-25_05"
+packages = ["cargo", "libiconv", "libxcrypt", "rustc", "yakut"]

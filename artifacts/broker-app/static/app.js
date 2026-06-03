@@ -1393,6 +1393,13 @@ async function saveParsedProperty() {
       body: JSON.stringify(payload),
     });
     if (!res) return;
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert("Could not add property: " + (err.error || res.statusText));
+      btn.disabled = false;
+      btn.textContent = "Add to Inventory";
+      return;
+    }
     const data = await res.json();
     discardParsed();
     await fetchProperties();
@@ -1400,6 +1407,7 @@ async function saveParsedProperty() {
       showMatchBanner(data.buyer_matches, data.property);
     }
   } catch (err) {
+    alert("Error adding property. Please try again.");
     btn.disabled = false;
     btn.textContent = "Add to Inventory";
   }

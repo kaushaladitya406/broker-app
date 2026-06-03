@@ -4,7 +4,7 @@ A Flask-based property management dashboard for real estate brokers — manage i
 
 ## Run & Operate
 
-- `python artifacts/broker-app/app.py` — run BrokerApp Flask server (port 8000)
+- `python3.11 artifacts/broker-app/app.py` — run BrokerApp Flask server (port 8000)
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - Required env: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY` — auto-set by Replit AI Integrations
 - Auth env: `SESSION_SECRET` (set), `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -60,6 +60,7 @@ _Populate as you build — explicit user instructions worth remembering across s
 ## Gotchas
 
 - Always restart BrokerApp workflow after changes to app.py
+- BrokerApp workflow must use `python3.11` — packages (supabase, pydantic) are installed in `.pythonlibs/lib/python3.11/` but the system default `python` resolves to Python 3.12, causing pydantic_core binary mismatch crashes
 - Static assets (`/static/*.js`, `/static/*.css`) are cache-busted via `?v={{ css_v }}`/`?v={{ js_v }}` (file mtime, injected by `inject_asset_versions` context processor) AND served with `no-cache` headers via `add_no_cache_for_static` after_request. This is required because the preview iframe aggressively caches static JS/CSS — without it, frontend changes appear not to take effect
 - Run `artifacts/broker-app/supabase_migration.sql` in Supabase SQL Editor before first use — creates tables, RLS, and the profile auto-create trigger
 - Supabase email confirmation: disable "Confirm email" in Supabase Auth → Providers → Email for instant login after signup (recommended for single-broker use)
