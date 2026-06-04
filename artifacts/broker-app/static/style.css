@@ -1188,6 +1188,9 @@ textarea#whatsappMsg::placeholder { color: var(--text-3); }
 /* Horizontal share variant (kept for compatibility) */
 .btn-share-row { flex-direction: row; gap: 5px; padding: 6px 12px; }
 .btn-share-row .btn-action-label { font-size: 12px; }
+/* Share button inside AI Matcher result cards */
+.btn-match-share { margin-left: auto; padding: 4px 8px; font-size: 11px; }
+.btn-match-share .btn-action-label { font-size: 11px; }
 
 /* ─── Area input row ────────────────────────────────────────────────── */
 .area-input-row { display: flex; gap: 8px; }

@@ -763,6 +763,7 @@ async function matchProperties() {
             <span class="config-tag">${p.configuration || ""}</span>
             <span class="type-tag">${p.property_type}</span>
             ${statusBadge(p.status)}
+            <button class="btn-share btn-match-share" data-action="share" data-id="${p.id}" title="Share on WhatsApp">${WHATSAPP_ICON}<span class="btn-action-label">Share</span></button>
           </div>
           <div class="match-card-location">${p.location}</div>
           <div class="match-card-details">
@@ -1361,7 +1362,7 @@ function renderConfirmCard(p) {
       </div>
     </div>
   `;
-  // Explicitly set field values after DOM insertion so number inputs reliably show the parsed values
+  // Immediately set values (catches most desktop browsers)
   const areaEl = document.getElementById("confirmAreaValue");
   if (areaEl && p.area_value > 0) {
     areaEl.value = p.area_value;
@@ -1372,6 +1373,21 @@ function renderConfirmCard(p) {
     priceEl.value = p.price;
     updatePriceConversion("confirmPrice", "confirmPriceConv");
   }
+  // setTimeout(200ms) fallback: mobile browsers (especially iOS Safari) may defer
+  // rendering of dynamically injected number inputs, ignoring both the value
+  // attribute and synchronous .value assignment until the next paint cycle.
+  setTimeout(function() {
+    const areaEl2 = document.getElementById("confirmAreaValue");
+    if (areaEl2 && p.area_value > 0 && !areaEl2.value) {
+      areaEl2.value = p.area_value;
+      updateAreaConversion("confirmAreaValue", "confirmAreaUnit", "confirmAreaConv");
+    }
+    const priceEl2 = document.getElementById("confirmPrice");
+    if (priceEl2 && p.price > 0 && !priceEl2.value) {
+      priceEl2.value = p.price;
+      updatePriceConversion("confirmPrice", "confirmPriceConv");
+    }
+  }, 200);
 }
 
 function discardParsed() {
