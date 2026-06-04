@@ -623,7 +623,8 @@ Return a JSON object with EXACTLY these 9 fields:
    IMPORTANT: Always return a whole integer. Never use floating point.
 
 7. "status": one of: Available, Rented, Sold, Reserved
-   (for rent/monthly/kiraya → Rented; sold/bikya → Sold; booked/reserved → Reserved; default → Available)
+   IMPORTANT: "for rent / available for rent / kiraya dena hai" means the property is AVAILABLE to be rented — use "Available", NOT "Rented".
+   "Rented" means already occupied by a tenant. "Sold" for sold/bikya. "Reserved" for booked/reserved. Default → "Available".
 
 8. "features": a comma-separated string of property amenities and features extracted from the text
    Examples: "East facing, lift, covered parking, gated society, newly renovated, corner plot"
@@ -694,6 +695,10 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
     valid_types = {"Apartment", "House", "Villa", "Office", "Shop", "Land", "Warehouse"}
     if result.get("property_type") not in valid_types:
         result["property_type"] = "Apartment"
+    # Normalize 4BHK variations: AI may return "4BHK", "4+BHK", "4 BHK" — all map to "4BHK+"
+    cfg_raw = str(result.get("configuration", "")).strip()
+    if _re.match(r'^4\s*\+?\s*BHK\s*\+?$', cfg_raw, _re.IGNORECASE):
+        result["configuration"] = "4BHK+"
     if result.get("configuration") not in set(VALID_CONFIGS):
         result["configuration"] = "Other"
     if result.get("area_unit") not in set(VALID_UNITS):
@@ -723,6 +728,10 @@ Return ONLY valid JSON. No markdown, no code blocks, no extra text before or aft
         result["listing_type"] = "For Sale"
     else:
         result["listing_type"] = "For Rent" if result.get("status") == "Rented" else "For Sale"
+    # "For Rent" listing with "Rented" status means it's available to be rented, not already occupied.
+    # Force status to Available so the property shows as ready to rent.
+    if result.get("listing_type") == "For Rent" and result.get("status") == "Rented":
+        result["status"] = "Available"
     return jsonify(result)
 
 

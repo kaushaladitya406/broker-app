@@ -543,7 +543,12 @@ async function saveProperty(e) {
   btn.textContent = "Saving...";
   try {
     if (editingId) {
-      const res = await apiFetch(`${API}/api/properties/${editingId}`, {
+      const cleanId = parseInt(editingId, 10);
+      if (isNaN(cleanId)) {
+        alert("Property ID is invalid — please close and re-open the edit modal.");
+        return;
+      }
+      const res = await apiFetch(`${API}/api/properties/${cleanId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1434,39 +1439,31 @@ async function saveParsedProperty() {
 // can silently fail in some browsers and on iOS Safari.
 
 function _dispatchInventoryAction(action, id, btn) {
-  if (action === "share")  shareProperty(id, btn);
-  else if (action === "status") openQuickStatusModal(id);
-  else if (action === "edit")   openEditModal(id);
-  else if (action === "delete") deleteProperty(id);
+  console.log("[Inventory] action:", action, "id:", id);
+  if (action === "share")        shareProperty(id, btn);
+  else if (action === "status")  openQuickStatusModal(id);
+  else if (action === "edit")    openEditModal(id);
+  else if (action === "delete")  deleteProperty(id);
+  else console.warn("[Inventory] unknown action:", action);
 }
 
-(function setupInventoryListeners() {
-  // Desktop table body
-  const tbody = document.getElementById("propertiesBody");
-  if (tbody) {
-    tbody.addEventListener("click", function(e) {
-      const btn = e.target.closest("[data-action]");
-      if (!btn) return;
-      _dispatchInventoryAction(btn.dataset.action, btn.dataset.id, btn);
-    });
+// Document-level delegation — attaches once at load, survives any innerHTML re-render
+// of table rows and mobile list. Most reliable for dynamically injected content.
+document.addEventListener("click", function(e) {
+  // Inventory action buttons (Share / Status / Edit / Delete)
+  const actionBtn = e.target.closest("[data-action]");
+  if (actionBtn) {
+    console.log("[Inventory] click on:", actionBtn.dataset.action, "id:", actionBtn.dataset.id);
+    _dispatchInventoryAction(actionBtn.dataset.action, actionBtn.dataset.id, actionBtn);
+    return;
   }
-
-  // Mobile list — row toggle + action buttons
-  const mobileList = document.getElementById("propMobileList");
-  if (mobileList) {
-    mobileList.addEventListener("click", function(e) {
-      // Action buttons take priority
-      const btn = e.target.closest("[data-action]");
-      if (btn) {
-        _dispatchInventoryAction(btn.dataset.action, btn.dataset.id, btn);
-        return;
-      }
-      // Row summary toggle
-      const summary = e.target.closest("[data-toggle-id]");
-      if (summary) toggleMobileRow(summary.dataset.toggleId);
-    });
+  // Mobile row summary toggle
+  const summary = e.target.closest("[data-toggle-id]");
+  if (summary) {
+    console.log("[Mobile] toggle row:", summary.dataset.toggleId);
+    toggleMobileRow(summary.dataset.toggleId);
   }
-})();
+});
 
 document.getElementById("searchInput").addEventListener("input", fetchProperties);
 document.getElementById("statusFilter").addEventListener("change", fetchProperties);
