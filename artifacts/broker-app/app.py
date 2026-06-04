@@ -331,7 +331,7 @@ def add_property():
     return jsonify({"property": prop, "buyer_matches": buyer_matches}), 201
 
 
-@app.route("/api/properties/<int:prop_id>", methods=["DELETE"])
+@app.route("/api/properties/<prop_id>", methods=["DELETE"])
 @login_required
 def delete_property(prop_id):
     uid = current_user_id()
@@ -339,7 +339,7 @@ def delete_property(prop_id):
     return jsonify({"success": True})
 
 
-@app.route("/api/properties/<int:prop_id>", methods=["PUT"])
+@app.route("/api/properties/<prop_id>", methods=["PUT"])
 @login_required
 def update_property(prop_id):
     uid = current_user_id()
@@ -377,7 +377,7 @@ def update_property(prop_id):
     return jsonify(enrich_property(result.data[0]))
 
 
-@app.route("/api/properties/<int:prop_id>/status", methods=["PATCH"])
+@app.route("/api/properties/<prop_id>/status", methods=["PATCH"])
 @login_required
 def update_property_status(prop_id):
     uid = current_user_id()
@@ -449,7 +449,7 @@ def add_client():
     return jsonify({"client": client, "property_matches": property_matches}), 201
 
 
-@app.route("/api/clients/<int:client_id>", methods=["PUT"])
+@app.route("/api/clients/<client_id>", methods=["PUT"])
 @login_required
 def update_client(client_id):
     uid = current_user_id()
@@ -469,7 +469,7 @@ def update_client(client_id):
     return jsonify(result.data[0])
 
 
-@app.route("/api/clients/<int:client_id>", methods=["DELETE"])
+@app.route("/api/clients/<client_id>", methods=["DELETE"])
 @login_required
 def delete_client(client_id):
     uid = current_user_id()
@@ -506,7 +506,7 @@ def add_followup():
     return jsonify(result.data[0]), 201
 
 
-@app.route("/api/followups/<int:fu_id>", methods=["DELETE"])
+@app.route("/api/followups/<fu_id>", methods=["DELETE"])
 @login_required
 def delete_followup(fu_id):
     uid = current_user_id()
@@ -514,7 +514,7 @@ def delete_followup(fu_id):
     return jsonify({"success": True})
 
 
-@app.route("/api/followups/<int:fu_id>", methods=["PUT"])
+@app.route("/api/followups/<fu_id>", methods=["PUT"])
 @login_required
 def update_followup(fu_id):
     uid = current_user_id()

@@ -543,12 +543,7 @@ async function saveProperty(e) {
   btn.textContent = "Saving...";
   try {
     if (editingId) {
-      const cleanId = parseInt(editingId, 10);
-      if (isNaN(cleanId)) {
-        alert("Property ID is invalid — please close and re-open the edit modal.");
-        return;
-      }
-      const res = await apiFetch(`${API}/api/properties/${cleanId}`, {
+      const res = await apiFetch(`${API}/api/properties/${editingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
